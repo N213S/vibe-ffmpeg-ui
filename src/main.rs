@@ -2,6 +2,7 @@
 
 mod app;
 mod ffmpeg;
+mod i18n;
 mod models;
 mod net;
 mod security;

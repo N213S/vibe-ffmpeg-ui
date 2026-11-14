@@ -22,6 +22,7 @@ pub struct MediaInfo {
 
 impl MediaInfo {
     /// Human-readable one-line summary for queue cards.
+    #[allow(dead_code)]
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
         if let (Some(w), Some(h)) = (self.width, self.height) {

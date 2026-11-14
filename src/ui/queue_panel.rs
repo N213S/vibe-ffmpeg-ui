@@ -1,10 +1,11 @@
+use crate::i18n::{Language, media_summary_localized, tr, verification_note_localized};
 use crate::models::config::ConversionSettings;
 use crate::models::media::{FileStatus, QueuedFile, format_bytes, format_duration};
 use crate::security::path_guard::compose_output_filename;
 use crate::ui::theme::{
     ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, card_frame, status_pill,
 };
-use eframe::egui::{self, ProgressBar, RichText, TextEdit};
+use eframe::egui::{self, Label, ProgressBar, RichText, TextEdit};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -17,19 +18,17 @@ pub struct QueueActions {
 /// Renders the central file queue with editable output filenames, auto-synced extension, and mode-aware verification status.
 pub fn render_queue_panel(
     ui: &mut egui::Ui,
+    lang: Language,
     queue: &mut [QueuedFile],
     settings: &ConversionSettings,
     is_running: bool,
     is_hovering_files: bool,
 ) -> QueueActions {
     let mut actions = QueueActions::default();
+    let t = tr(lang);
 
     if is_hovering_files {
-        status_pill(
-            ui,
-            "Drop video, audio, or image files anywhere to add to queue",
-            ACCENT_BLUE,
-        );
+        status_pill(ui, t.drop_hover_hint(), ACCENT_BLUE);
         ui.add_space(6.0);
     }
 
@@ -38,20 +37,21 @@ pub fn render_queue_panel(
             card_frame().show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(32.0);
-                    ui.label(
-                        RichText::new("Drag & Drop Video, Audio, or Image Files Here")
-                            .size(18.0)
-                            .strong(),
+                    ui.add(
+                        Label::new(
+                            RichText::new(t.drop_empty_title())
+                                .size(18.0)
+                                .strong(),
+                        )
+                        .wrap(),
                     );
                     ui.add_space(8.0);
-                    ui.label(
-                        RichText::new(
-                            "Supports Video, Audio Extraction, Image/GIF, and Fast Remux.\nFiles are probed, staged atomically (.tmp.<ext>), and verified cleanly.",
-                        )
-                        .color(TEXT_MUTED),
+                    ui.add(
+                        Label::new(RichText::new(t.drop_empty_subtitle()).color(TEXT_MUTED))
+                            .wrap(),
                     );
                     ui.add_space(16.0);
-                    if ui.button("+ Browse Media Files").clicked() {
+                    if ui.button(t.browse_media_files()).clicked() {
                         actions.add_files_clicked = true;
                     }
                     ui.add_space(32.0);
@@ -65,7 +65,7 @@ pub fn render_queue_panel(
         .auto_shrink([false, false])
         .show(ui, |ui| {
             for item in queue.iter_mut() {
-                render_file_card(ui, item, settings, is_running, &mut actions);
+                render_file_card(ui, lang, item, settings, is_running, &mut actions);
                 ui.add_space(6.0);
             }
         });
@@ -75,11 +75,13 @@ pub fn render_queue_panel(
 
 fn render_file_card(
     ui: &mut egui::Ui,
+    lang: Language,
     item: &mut QueuedFile,
     settings: &ConversionSettings,
     is_running: bool,
     actions: &mut QueueActions,
 ) {
+    let t = tr(lang);
     let file_name = item
         .input_path
         .file_name()
@@ -88,33 +90,7 @@ fn render_file_card(
 
     card_frame().show(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.label(RichText::new(&file_name).size(14.5).strong());
-                if let Some(ref media) = item.media {
-                    let size_txt = if media.file_size_bytes > 0 {
-                        format!("  |  {}", format_bytes(media.file_size_bytes))
-                    } else {
-                        String::new()
-                    };
-                    ui.label(
-                        RichText::new(format!("{}{}", media.summary(), size_txt))
-                            .size(12.0)
-                            .color(TEXT_MUTED),
-                    );
-                } else if let Some(ref err) = item.probe_error {
-                    ui.label(
-                        RichText::new(format!("Probe error: {err}"))
-                            .size(12.0)
-                            .color(ACCENT_RED),
-                    );
-                } else {
-                    ui.label(
-                        RichText::new("Inspecting media streams...")
-                            .size(12.0)
-                            .color(TEXT_MUTED),
-                    );
-                }
-            });
+            ui.label(RichText::new(&file_name).size(14.5).strong());
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let removable = !is_running
@@ -125,12 +101,44 @@ fn render_file_card(
                             | FileStatus::Failed(_)
                             | FileStatus::Cancelled
                     );
-                if removable && ui.small_button("Remove").clicked() {
+                if removable && ui.small_button(t.remove_btn()).clicked() {
                     actions.remove_file_id = Some(item.id);
                 }
-                render_status_badge(ui, &item.status);
+                render_status_badge(ui, lang, &item.status);
             });
         });
+
+        if let Some(ref media) = item.media {
+            let size_txt = if media.file_size_bytes > 0 {
+                format!("  |  {}", format_bytes(media.file_size_bytes))
+            } else {
+                String::new()
+            };
+            let summary = media_summary_localized(lang, media);
+            ui.add(
+                Label::new(
+                    RichText::new(format!("{summary}{size_txt}"))
+                        .size(12.0)
+                        .color(TEXT_MUTED),
+                )
+                .wrap(),
+            );
+        } else if let Some(ref err) = item.probe_error {
+            ui.add(
+                Label::new(
+                    RichText::new(format!("{} {err}", t.probe_error_prefix()))
+                        .size(12.0)
+                        .color(ACCENT_RED),
+                )
+                .wrap(),
+            );
+        } else {
+            ui.label(
+                RichText::new(t.inspecting_streams())
+                    .size(12.0)
+                    .color(TEXT_MUTED),
+            );
+        }
 
         // Editable output stem + auto-synced container extension.
         ui.add_space(4.0);
@@ -142,12 +150,12 @@ fn render_file_card(
             );
 
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new("Output:").size(12.0).color(TEXT_MUTED));
+            ui.label(RichText::new(t.output_label()).size(12.0).color(TEXT_MUTED));
             ui.add_enabled(
                 editable,
                 TextEdit::singleline(&mut item.custom_stem)
                     .desired_width(210.0)
-                    .hint_text("output filename"),
+                    .hint_text(t.output_hint()),
             );
             ui.label(
                 RichText::new(format!(".{ext}"))
@@ -184,28 +192,31 @@ fn render_file_card(
                 );
                 let mut metrics = Vec::new();
                 if let Some(ref speed) = stats.speed {
-                    metrics.push(format!("Speed: {speed}"));
+                    metrics.push(format!("{}: {speed}", t.metric_speed()));
                 }
                 if let Some(ref fps) = stats.fps {
-                    metrics.push(format!("FPS: {fps}"));
+                    metrics.push(format!("{}: {fps}", t.metric_fps()));
                 }
                 if let Some(ref br) = stats.bitrate {
-                    metrics.push(format!("Bitrate: {br}"));
+                    metrics.push(format!("{}: {br}", t.metric_bitrate()));
                 }
                 if !metrics.is_empty() {
-                    ui.label(
-                        RichText::new(metrics.join("  |  "))
-                            .size(11.5)
-                            .color(TEXT_MUTED),
+                    ui.add(
+                        Label::new(
+                            RichText::new(metrics.join("  |  "))
+                                .size(11.5)
+                                .color(TEXT_MUTED),
+                        )
+                        .wrap(),
                     );
                 }
             }
             FileStatus::Verifying => {
                 ui.add_space(6.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.spinner();
                     ui.label(
-                        RichText::new("Running mode-aware ffprobe & integrity verification...")
+                        RichText::new(t.verifying_progress())
                             .size(12.0)
                             .color(ACCENT_AMBER),
                     );
@@ -231,40 +242,47 @@ fn render_file_card(
                     } else {
                         ACCENT_AMBER
                     };
+                    let stream_word = if report.stream_count == 1 {
+                        t.stream_singular()
+                    } else {
+                        t.stream_plural()
+                    };
+                    let localized_note =
+                        verification_note_localized(lang, &report.verification_note);
                     ui.label(
                         RichText::new(format!(
-                            "Saved: {out_name} ({} | {} stream{}{dur_tag}) [{}]",
+                            "{} {out_name} ({} | {} {stream_word}{dur_tag}) [{localized_note}]",
+                            t.saved_label(),
                             format_bytes(report.size_bytes),
                             report.stream_count,
-                            if report.stream_count == 1 { "" } else { "s" },
-                            report.verification_note
                         ))
                         .size(12.0)
                         .color(summary_color),
                     );
-                    if ui.small_button("Reveal in Folder").clicked() {
+                    if ui.small_button(t.reveal_in_folder()).clicked() {
                         reveal_in_explorer(output_path);
                     }
                 });
             }
             FileStatus::Failed(err) => {
                 ui.add_space(4.0);
-                ui.label(RichText::new(err).size(12.0).color(ACCENT_RED));
+                ui.add(Label::new(RichText::new(err).size(12.0).color(ACCENT_RED)).wrap());
             }
             _ => {}
         }
     });
 }
 
-fn render_status_badge(ui: &mut egui::Ui, status: &FileStatus) {
+fn render_status_badge(ui: &mut egui::Ui, lang: Language, status: &FileStatus) {
+    let t = tr(lang);
     match status {
-        FileStatus::Probing => status_pill(ui, "Probing", ACCENT_BLUE),
-        FileStatus::Ready => status_pill(ui, "Ready", ACCENT_BLUE),
-        FileStatus::Converting(_) => status_pill(ui, "Converting", ACCENT_BLUE),
-        FileStatus::Verifying => status_pill(ui, "Verifying", ACCENT_AMBER),
-        FileStatus::Done { .. } => status_pill(ui, "Verified OK", ACCENT_GREEN),
-        FileStatus::Failed(_) => status_pill(ui, "Failed", ACCENT_RED),
-        FileStatus::Cancelled => status_pill(ui, "Cancelled", ACCENT_AMBER),
+        FileStatus::Probing => status_pill(ui, t.status_probing(), ACCENT_BLUE),
+        FileStatus::Ready => status_pill(ui, t.status_ready(), ACCENT_BLUE),
+        FileStatus::Converting(_) => status_pill(ui, t.status_converting(), ACCENT_BLUE),
+        FileStatus::Verifying => status_pill(ui, t.status_verifying(), ACCENT_AMBER),
+        FileStatus::Done { .. } => status_pill(ui, t.status_verified_ok(), ACCENT_GREEN),
+        FileStatus::Failed(_) => status_pill(ui, t.status_failed(), ACCENT_RED),
+        FileStatus::Cancelled => status_pill(ui, t.status_cancelled(), ACCENT_AMBER),
     }
 }
 

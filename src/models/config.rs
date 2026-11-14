@@ -12,6 +12,7 @@ pub enum ConvertMode {
 impl ConvertMode {
     pub const ALL: &'static [Self] = &[Self::Video, Self::AudioOnly, Self::ImageGif, Self::Remux];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Video => "Video",
@@ -75,6 +76,7 @@ pub enum ContainerFormat {
 }
 
 impl ContainerFormat {
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Mp4 => "MP4 (Universal)",
@@ -196,6 +198,7 @@ impl VideoCodec {
         }
     }
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Copy => "Stream Copy (No Re-encode)",
@@ -271,6 +274,7 @@ impl AudioCodec {
         }
     }
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Aac => "AAC (Universal)",
@@ -340,6 +344,7 @@ impl EncodeSpeed {
         Self::Slower,
     ];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Ultrafast => "Ultrafast",
@@ -415,6 +420,7 @@ pub enum PixelFormat {
 impl PixelFormat {
     pub const ALL: &'static [Self] = &[Self::Yuv420p, Self::Yuv420p10le, Self::KeepOriginal];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Yuv420p => "yuv420p (8-bit Universal)",
@@ -452,6 +458,7 @@ impl ResolutionOption {
         Self::Sd480p,
     ];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Original => "Original Resolution",
@@ -476,6 +483,7 @@ pub enum FpsOption {
 impl FpsOption {
     pub const ALL: &'static [Self] = &[Self::Original, Self::Fps24, Self::Fps30, Self::Fps60];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Original => "Original FPS",
@@ -506,6 +514,7 @@ pub enum AudioChannels {
 impl AudioChannels {
     pub const ALL: &'static [Self] = &[Self::KeepOriginal, Self::Stereo, Self::Mono];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::KeepOriginal => "Original Channels",
@@ -534,6 +543,7 @@ pub enum AudioSampleRate {
 impl AudioSampleRate {
     pub const ALL: &'static [Self] = &[Self::KeepOriginal, Self::Hz44100, Self::Hz48000];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::KeepOriginal => "Original Sample Rate",
@@ -678,6 +688,7 @@ impl PresetProfile {
         Self::InstantRemuxMkv,
     ];
 
+    #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Mp4UniversalH264 => "[Video] MP4 Universal H.264 + AAC",

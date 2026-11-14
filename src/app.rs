@@ -1,6 +1,7 @@
 use crate::ffmpeg::discovery::discover_local_ffmpeg;
 use crate::ffmpeg::probe::probe_media;
 use crate::ffmpeg::runner::{BatchJobItem, spawn_batch_conversion};
+use crate::i18n::{Language, tr};
 use crate::models::config::ConversionSettings;
 use crate::models::media::{
     FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile, UpdateCheckState, WorkerEvent,
@@ -10,6 +11,7 @@ use crate::security::path_guard::{
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_supported_media_extension,
     paths_refer_to_same_file, sanitize_file_stem, validate_input_file,
 };
+use crate::ui::language_window::render_language_window;
 use crate::ui::log_panel::render_log_panel;
 use crate::ui::queue_panel::render_queue_panel;
 use crate::ui::settings_panel::render_settings_panel;
@@ -28,6 +30,9 @@ const MAX_LOG_LINES: usize = 400;
 /// Main desktop application state.
 pub struct FfmpegStudioApp {
     ffmpeg_info: LocalFfmpegInfo,
+    language: Language,
+    language_window_open: bool,
+    language_search: String,
     settings: ConversionSettings,
     queue: Vec<QueuedFile>,
     next_file_id: u64,
@@ -45,20 +50,26 @@ impl FfmpegStudioApp {
         configure_style_and_fonts(&cc.egui_ctx);
         let ffmpeg_info = discover_local_ffmpeg();
         let (tx, rx) = mpsc::channel();
+        let language = Language::default();
+        let t = tr(language);
 
         let mut logs = VecDeque::with_capacity(64);
         if !ffmpeg_info.raw_version_line.is_empty() {
             logs.push_back(format!("[Init] {}", ffmpeg_info.raw_version_line));
             logs.push_back(format!(
-                "[Init] Detected {} available encoders.",
+                "{} {}",
+                t.log_init_encoders(),
                 ffmpeg_info.available_encoders.len()
             ));
         } else {
-            logs.push_back("[Warning] ffmpeg.exe / ffprobe.exe not found on PATH.".to_string());
+            logs.push_back(t.log_init_missing().to_string());
         }
 
         Self {
             ffmpeg_info,
+            language,
+            language_window_open: false,
+            language_search: String::new(),
             settings: ConversionSettings::default(),
             queue: Vec::new(),
             next_file_id: 1,
@@ -80,19 +91,17 @@ impl FfmpegStudioApp {
     }
 
     fn enqueue_paths(&mut self, paths: Vec<PathBuf>, ctx: &egui::Context, filter_dropped: bool) {
+        let t = tr(self.language);
         for raw_path in paths {
             if filter_dropped && !is_supported_media_extension(&raw_path) {
-                self.push_log(format!(
-                    "[Skipped] Unsupported media extension: {}",
-                    raw_path.display()
-                ));
+                self.push_log(format!("{} {}", t.log_skipped_ext(), raw_path.display()));
                 continue;
             }
 
             let valid_path = match validate_input_file(&raw_path) {
                 Ok(p) => p,
                 Err(err) => {
-                    self.push_log(format!("[Skipped] {err}"));
+                    self.push_log(format!("{} {err}", t.log_skipped_prefix()));
                     continue;
                 }
             };
@@ -134,12 +143,13 @@ impl FfmpegStudioApp {
                     ctx_clone.request_repaint();
                 });
             } else if let Some(item) = self.queue.iter_mut().find(|f| f.id == file_id) {
-                item.status = FileStatus::Failed("ffprobe not found".to_string());
+                item.status = FileStatus::Failed(t.ffprobe_not_found().to_string());
             }
         }
     }
 
     fn open_file_picker(&mut self, ctx: &egui::Context) {
+        let t = tr(self.language);
         let mut all_media = Vec::with_capacity(
             VIDEO_EXTENSIONS.len() + AUDIO_EXTENSIONS.len() + IMAGE_EXTENSIONS.len(),
         );
@@ -148,11 +158,11 @@ impl FfmpegStudioApp {
         all_media.extend_from_slice(IMAGE_EXTENSIONS);
 
         if let Some(files) = rfd::FileDialog::new()
-            .add_filter("All Supported Media", &all_media)
-            .add_filter("Video Files", VIDEO_EXTENSIONS)
-            .add_filter("Audio Files", AUDIO_EXTENSIONS)
-            .add_filter("Image Files", IMAGE_EXTENSIONS)
-            .add_filter("All Files", &["*"])
+            .add_filter(t.file_filter_all_media(), &all_media)
+            .add_filter(t.file_filter_video(), VIDEO_EXTENSIONS)
+            .add_filter(t.file_filter_audio(), AUDIO_EXTENSIONS)
+            .add_filter(t.file_filter_image(), IMAGE_EXTENSIONS)
+            .add_filter(t.file_filter_all_files(), &["*"])
             .pick_files()
         {
             self.enqueue_paths(files, ctx, false);
@@ -263,15 +273,21 @@ impl FfmpegStudioApp {
                 }
                 WorkerEvent::UpdateChecked(res) => match res {
                     Ok(info) => {
+                        let t = tr(self.language);
+                        let local_str = info
+                            .local_version
+                            .as_deref()
+                            .unwrap_or(t.log_unknown_version());
                         self.push_log(format!(
-                            "[Update Check] Official Gyan.dev release: {} (local: {})",
+                            "{} {} ({local_str})",
+                            t.log_update_ok(),
                             info.latest_release,
-                            info.local_version.as_deref().unwrap_or("unknown")
                         ));
                         self.update_state = UpdateCheckState::Completed(info);
                     }
                     Err(err) => {
-                        self.push_log(format!("[Update Check Error] {err}"));
+                        let t = tr(self.language);
+                        self.push_log(format!("{} {err}", t.log_update_err()));
                         self.update_state = UpdateCheckState::Error(err);
                     }
                 },
@@ -326,6 +342,7 @@ impl eframe::App for FfmpegStudioApp {
             .show(ui, |ui| {
                 render_top_bar(
                     ui,
+                    self.language,
                     &self.ffmpeg_info,
                     &self.update_state,
                     self.is_running,
@@ -349,8 +366,9 @@ impl eframe::App for FfmpegStudioApp {
             self.start_batch(ui.ctx());
         }
         if top_actions.cancel_batch {
+            let t = tr(self.language);
             self.cancel_flag.store(true, Ordering::Relaxed);
-            self.push_log("[Batch] Cancellation requested; terminating active job...".to_string());
+            self.push_log(t.log_batch_cancel().to_string());
         }
         if top_actions.check_updates {
             self.update_state = UpdateCheckState::Checking;
@@ -360,12 +378,24 @@ impl eframe::App for FfmpegStudioApp {
                 ui.ctx().clone(),
             );
         }
+        if top_actions.toggle_language {
+            self.language_window_open = !self.language_window_open;
+            if self.language_window_open {
+                self.language_search.clear();
+            }
+        }
 
         let mut clear_log = false;
         Panel::bottom("bottom_logs")
             .frame(panel_frame)
             .show(ui, |ui| {
-                render_log_panel(ui, &self.logs, &mut self.log_expanded, &mut clear_log);
+                render_log_panel(
+                    ui,
+                    self.language,
+                    &self.logs,
+                    &mut self.log_expanded,
+                    &mut clear_log,
+                );
             });
         if clear_log {
             self.logs.clear();
@@ -374,13 +404,14 @@ impl eframe::App for FfmpegStudioApp {
         let first_queued = self.queue.first().cloned();
         Panel::right("right_settings")
             .resizable(true)
-            .default_size(385.0)
-            .min_size(320.0)
-            .max_size(490.0)
+            .default_size(400.0)
+            .min_size(340.0)
+            .max_size(520.0)
             .frame(panel_frame)
             .show(ui, |ui| {
                 render_settings_panel(
                     ui,
+                    self.language,
                     &mut self.settings,
                     &self.ffmpeg_info,
                     first_queued.as_ref(),
@@ -393,6 +424,7 @@ impl eframe::App for FfmpegStudioApp {
             .show(ui, |ui| {
                 render_queue_panel(
                     ui,
+                    self.language,
                     &mut self.queue,
                     &self.settings,
                     self.is_running,
@@ -407,6 +439,13 @@ impl eframe::App for FfmpegStudioApp {
         if queue_actions.add_files_clicked && !self.is_running {
             self.open_file_picker(ui.ctx());
         }
+
+        render_language_window(
+            ui.ctx(),
+            &mut self.language,
+            &mut self.language_window_open,
+            &mut self.language_search,
+        );
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

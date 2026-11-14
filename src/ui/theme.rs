@@ -40,15 +40,15 @@ pub fn configure_style_and_fonts(ctx: &egui::Context) {
 fn load_unicode_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
 
-    // Load Thai + Unicode Windows system fonts if present so non-ASCII filenames render cleanly.
-    let candidates = [
-        ("segoe_ui", "C:\\Windows\\Fonts\\segoeui.ttf"),
-        ("tahoma", "C:\\Windows\\Fonts\\tahoma.ttf"),
-        ("leelawadee", "C:\\Windows\\Fonts\\leelawui.ttf"),
+    // Prepend primary UI fonts so Latin, Vietnamese diacritics, Cyrillic, and Thai use crisp native metrics.
+    let primary_fonts = [
+        ("tahoma", &["C:\\Windows\\Fonts\\tahoma.ttf"][..]),
+        ("leelawadee", &["C:\\Windows\\Fonts\\leelawui.ttf"][..]),
+        ("segoe_ui", &["C:\\Windows\\Fonts\\segoeui.ttf"][..]),
     ];
 
-    for (name, path) in candidates {
-        if let Ok(bytes) = std::fs::read(path) {
+    for (name, candidates) in primary_fonts {
+        if let Some(bytes) = read_first_available_font(candidates) {
             fonts
                 .font_data
                 .insert(name.to_string(), Arc::new(FontData::from_owned(bytes)));
@@ -61,7 +61,66 @@ fn load_unicode_fonts(ctx: &egui::Context) {
         }
     }
 
+    // Append CJK, Korean Hangul, and broad Latin/Cyrillic fallbacks without overriding primary Latin metrics.
+    let fallback_fonts = [
+        (
+            "cjk_kr",
+            &[
+                "C:\\Windows\\Fonts\\malgun.ttf",
+                "C:\\Windows\\Fonts\\gulim.ttc",
+            ][..],
+        ),
+        (
+            "cjk_jp",
+            &[
+                "C:\\Windows\\Fonts\\meiryo.ttc",
+                "C:\\Windows\\Fonts\\YuGothR.ttc",
+                "C:\\Windows\\Fonts\\msgothic.ttc",
+            ][..],
+        ),
+        (
+            "cjk_sc",
+            &[
+                "C:\\Windows\\Fonts\\msyh.ttc",
+                "C:\\Windows\\Fonts\\simsun.ttc",
+            ][..],
+        ),
+        (
+            "cjk_tc",
+            &[
+                "C:\\Windows\\Fonts\\msjh.ttc",
+                "C:\\Windows\\Fonts\\mingliub.ttc",
+            ][..],
+        ),
+        ("arial_fallback", &["C:\\Windows\\Fonts\\arial.ttf"][..]),
+    ];
+
+    for (name, candidates) in fallback_fonts {
+        if let Some(bytes) = read_first_available_font(candidates) {
+            fonts
+                .font_data
+                .insert(name.to_string(), Arc::new(FontData::from_owned(bytes)));
+            if let Some(prop) = fonts.families.get_mut(&FontFamily::Proportional) {
+                prop.push(name.to_string());
+            }
+            if let Some(mono) = fonts.families.get_mut(&FontFamily::Monospace) {
+                mono.push(name.to_string());
+            }
+        }
+    }
+
     ctx.set_fonts(fonts);
+}
+
+fn read_first_available_font(paths: &[&str]) -> Option<Vec<u8>> {
+    for path in paths {
+        if let Ok(bytes) = std::fs::read(path)
+            && !bytes.is_empty()
+        {
+            return Some(bytes);
+        }
+    }
+    None
 }
 
 /// Standard rounded card frame used across queue and settings sections.

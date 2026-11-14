@@ -6,6 +6,13 @@
 
 Lightweight, native multi-mode desktop GUI for FFmpeg written in Rust (`eframe` / `egui` 0.37 + `rfd` 0.18), engineered for speed, complete parameter generation, custom output naming, and mode-aware integrity verification.
 
+![Vibe FFmpeg UI](assets/screenshot.png)
+
+## Quick Start
+
+1. Make sure **`ffmpeg`** and **`ffprobe`** are available on your system **`PATH`** or placed in the **same folder** next to `ffmpeg-ui.exe` ([official Windows builds](https://www.gyan.dev/ffmpeg/builds/)).
+2. Run `ffmpeg-ui.exe` (or build from source below).
+
 ## Features & Architecture
 
 - **Multi-Mode Conversion (`ConvertMode`)**:
@@ -28,7 +35,8 @@ Lightweight, native multi-mode desktop GUI for FFmpeg written in Rust (`eframe` 
 - `src/security/path_guard.rs` — Path canonicalization, filename sanitization, prefix/suffix composition, collision protection, and `.tmp.<ext>` staging.
 - `src/ffmpeg/` — `discovery.rs`, `probe.rs`, `command_builder.rs`, `validator.rs`, `runner.rs`.
 - `src/net/ffmpeg_update.rs` — HTTPS official FFmpeg update check.
-- `src/ui/` — `theme.rs`, `top_bar.rs`, `queue_panel.rs`, `settings_panel.rs`, `log_panel.rs`.
+- `src/i18n/` — 14-language localization tables with English fallback.
+- `src/ui/` — `theme.rs`, `top_bar.rs`, `queue_panel.rs`, `settings_panel.rs`, `log_panel.rs`, `language_window.rs`.
 
 ## Build & Test
 

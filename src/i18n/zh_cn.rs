@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("诊断与校验日志"),
     clear_log: Some("清空日志"),
+    copy_log: Some("复制全部"),
+    pop_out_window: Some("弹出独立窗口"),
     no_logs_yet: Some("暂无执行日志。"),
     log_init_missing: Some("[警告] PATH 中未检测到 ffmpeg.exe / ffprobe.exe。"),
     log_init_encoders: Some("[初始化] 检测到可用编码器数量:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[更新检查] Gyan.dev 官方版本:"),
     log_update_err: Some("[更新检查失败]"),
     log_unknown_version: Some("未知"),
+
+    mode_subtitle: Some("字幕"),
+    file_filter_subtitle: Some("字幕文件"),
+    from_label: Some("从"),
+    to_label: Some("转为"),
+    search_format_hint: Some("搜索格式 (如 mp4, webp, srt)..."),
+    image_duration_label: Some("静图时长 (秒)"),
+    subtitle_section: Some("字幕提取与格式转换"),
+    subtitle_description: Some("提取视频中的字幕流或互相转换格式 (SRT, ASS, SSA, VTT, LRC)。"),
+    incompat_no_audio: Some("源文件不包含音频流。"),
+    incompat_no_subtitle: Some("源文件不包含字幕流。"),
+    incompat_no_visual_or_audio: Some("源文件不包含视频、图像或音频流。"),
+    incompat_no_remux: Some("此源文件不支持无损直接封装 (请切换为视频或图像模式)。"),
 };

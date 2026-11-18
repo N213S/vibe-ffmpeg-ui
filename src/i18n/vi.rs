@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("Nhật ký Chẩn đoán & Kiểm tra"),
     clear_log: Some("Xóa nhật ký"),
+    copy_log: Some("Sao chép tất cả"),
+    pop_out_window: Some("Mở cửa sổ riêng"),
     no_logs_yet: Some("Chưa có nhật ký thực thi nào."),
     log_init_missing: Some("[Cảnh báo] Không tìm thấy ffmpeg.exe / ffprobe.exe trong PATH."),
     log_init_encoders: Some("[Khởi tạo] Số bộ mã hóa khả dụng:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[Kiểm tra cập nhật] Bản Gyan.dev chính thức:"),
     log_update_err: Some("[Lỗi kiểm tra cập nhật]"),
     log_unknown_version: Some("không rõ"),
+
+    mode_subtitle: Some("Phụ đề"),
+    file_filter_subtitle: Some("Tệp phụ đề"),
+    from_label: Some("TỪ"),
+    to_label: Some("SANG"),
+    search_format_hint: Some("Tìm định dạng (vd: mp4, webp, srt)..."),
+    image_duration_label: Some("Thời lượng ảnh (giây)"),
+    subtitle_section: Some("Trích xuất & Chuyển đổi phụ đề"),
+    subtitle_description: Some("Trích xuất hoặc chuyển đổi luồng phụ đề văn bản (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("Tệp nguồn không có luồng âm thanh."),
+    incompat_no_subtitle: Some("Tệp nguồn không có luồng phụ đề."),
+    incompat_no_visual_or_audio: Some("Tệp nguồn không có luồng video, ảnh hoặc âm thanh."),
+    incompat_no_remux: Some("Nguồn không hỗ trợ sao chép luồng trực tiếp (hãy dùng chế độ Video hoặc Ảnh)."),
 };

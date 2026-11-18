@@ -15,7 +15,7 @@ mod zh_tw;
 
 use crate::models::config::{
     AudioChannels, AudioCodec, AudioSampleRate, ContainerFormat, ConvertMode, EncodeSpeed,
-    FpsOption, PixelFormat, PresetProfile, ResolutionOption, VideoCodec,
+    FpsOption, IncompatibilityReason, PixelFormat, PresetProfile, ResolutionOption, VideoCodec,
 };
 use crate::models::media::{MediaInfo, format_duration};
 use serde::{Deserialize, Serialize};
@@ -219,6 +219,7 @@ define_translations!(
     file_filter_video,
     file_filter_audio,
     file_filter_image,
+    file_filter_subtitle,
     file_filter_all_files,
     drop_hover_hint,
     drop_empty_title,
@@ -257,7 +258,11 @@ define_translations!(
     mode_video,
     mode_audio,
     mode_image_gif,
+    mode_subtitle,
     mode_remux,
+    from_label,
+    to_label,
+    search_format_hint,
     quick_presets,
     choose_preset_placeholder,
     format_output_section,
@@ -284,6 +289,7 @@ define_translations!(
     width_short,
     height_short,
     frame_rate,
+    image_duration_label,
     image_gif_section,
     animated_webp_toggle,
     fps_label,
@@ -293,6 +299,12 @@ define_translations!(
     quality_label,
     png_compression_label,
     avif_crf_label,
+    subtitle_section,
+    subtitle_description,
+    incompat_no_audio,
+    incompat_no_subtitle,
+    incompat_no_visual_or_audio,
+    incompat_no_remux,
     remux_section,
     remux_description,
     audio_params_section,
@@ -388,6 +400,8 @@ define_translations!(
     // Diagnostic log & runtime notifications
     diagnostic_log_title,
     clear_log,
+    copy_log,
+    pop_out_window,
     no_logs_yet,
     log_init_missing,
     log_init_encoders,
@@ -429,28 +443,39 @@ pub const fn mode_label(lang: Language, mode: ConvertMode) -> &'static str {
         ConvertMode::Video => t.mode_video(),
         ConvertMode::AudioOnly => t.mode_audio(),
         ConvertMode::ImageGif => t.mode_image_gif(),
+        ConvertMode::Subtitle => t.mode_subtitle(),
         ConvertMode::Remux => t.mode_remux(),
     }
 }
 
-pub const fn container_label(lang: Language, c: ContainerFormat) -> &'static str {
+pub const fn incompatibility_tooltip(lang: Language, reason: IncompatibilityReason) -> &'static str {
     let t = tr(lang);
+    match reason {
+        IncompatibilityReason::NoAudioStream => t.incompat_no_audio(),
+        IncompatibilityReason::NoSubtitleStream => t.incompat_no_subtitle(),
+        IncompatibilityReason::NoVisualOrAudioStream => t.incompat_no_visual_or_audio(),
+        IncompatibilityReason::NoRemuxableStream => t.incompat_no_remux(),
+    }
+}
+
+pub const fn container_label(_lang: Language, c: ContainerFormat) -> &'static str {
     match c {
-        ContainerFormat::Mp4 => t.fmt_mp4(),
-        ContainerFormat::Mkv => t.fmt_mkv(),
-        ContainerFormat::Mov => t.fmt_mov(),
-        ContainerFormat::WebM => t.fmt_webm(),
-        ContainerFormat::Mp3 => t.fmt_mp3(),
-        ContainerFormat::Flac => t.fmt_flac(),
-        ContainerFormat::Wav => t.fmt_wav(),
-        ContainerFormat::M4a => t.fmt_m4a(),
-        ContainerFormat::Opus => t.fmt_opus(),
-        ContainerFormat::Ogg => t.fmt_ogg(),
-        ContainerFormat::Gif => t.fmt_gif(),
-        ContainerFormat::Webp => t.fmt_webp(),
-        ContainerFormat::Png => t.fmt_png(),
-        ContainerFormat::Jpg => t.fmt_jpg(),
-        ContainerFormat::Avif => t.fmt_avif(),
+        ContainerFormat::Mp4 => tr(_lang).fmt_mp4(),
+        ContainerFormat::Mkv => tr(_lang).fmt_mkv(),
+        ContainerFormat::Mov => tr(_lang).fmt_mov(),
+        ContainerFormat::WebM => tr(_lang).fmt_webm(),
+        ContainerFormat::Mp3 => tr(_lang).fmt_mp3(),
+        ContainerFormat::Flac => tr(_lang).fmt_flac(),
+        ContainerFormat::Wav => tr(_lang).fmt_wav(),
+        ContainerFormat::M4a => tr(_lang).fmt_m4a(),
+        ContainerFormat::Opus => tr(_lang).fmt_opus(),
+        ContainerFormat::Ogg => tr(_lang).fmt_ogg(),
+        ContainerFormat::Gif => tr(_lang).fmt_gif(),
+        ContainerFormat::Webp => tr(_lang).fmt_webp(),
+        ContainerFormat::Png => tr(_lang).fmt_png(),
+        ContainerFormat::Jpg => tr(_lang).fmt_jpg(),
+        ContainerFormat::Avif => tr(_lang).fmt_avif(),
+        other => other.label(),
     }
 }
 
@@ -469,6 +494,7 @@ pub const fn video_codec_label(lang: Language, vc: VideoCodec) -> &'static str {
         VideoCodec::HevcAmf => t.vcodec_hevc_amf(),
         VideoCodec::H264Qsv => t.vcodec_h264_qsv(),
         VideoCodec::HevcQsv => t.vcodec_hevc_qsv(),
+        other => other.label(),
     }
 }
 
@@ -483,6 +509,7 @@ pub const fn audio_codec_label(lang: Language, ac: AudioCodec) -> &'static str {
         AudioCodec::PcmS16le => t.acodec_pcm(),
         AudioCodec::Copy => t.acodec_copy(),
         AudioCodec::None => t.acodec_mute(),
+        other => other.label(),
     }
 }
 
@@ -647,6 +674,14 @@ mod tests {
                 for container in mode.containers() {
                     assert!(!container_label(lang, *container).trim().is_empty());
                 }
+            }
+            for reason in [
+                IncompatibilityReason::NoAudioStream,
+                IncompatibilityReason::NoSubtitleStream,
+                IncompatibilityReason::NoVisualOrAudioStream,
+                IncompatibilityReason::NoRemuxableStream,
+            ] {
+                assert!(!incompatibility_tooltip(lang, reason).trim().is_empty());
             }
             for vc in VideoCodec::ALL {
                 assert!(!video_codec_label(lang, *vc).trim().is_empty());

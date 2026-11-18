@@ -1,3 +1,5 @@
+use crate::i18n::Language;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -8,16 +10,20 @@ const TRUSTED_HTTPS_PREFIXES: &[&str] = &[
 ];
 
 pub const VIDEO_EXTENSIONS: &[&str] = &[
-    "mp4", "mkv", "mov", "avi", "webm", "flv", "ts", "m4v", "wmv", "mpg", "mpeg", "3gp",
+    "mp4", "mkv", "mov", "webm", "avi", "flv", "ts", "m2ts", "mxf", "3gp", "m4v", "mpg", "mpeg",
+    "vob", "ogv", "wmv", "dv", "rm", "rmvb", "mod", "tod", "bik", "mts", "asf", "swf",
 ];
 pub const AUDIO_EXTENSIONS: &[&str] = &[
-    "mp3", "wav", "flac", "m4a", "aac", "ogg", "opus", "wma",
+    "mp3", "wav", "flac", "aac", "m4a", "ogg", "opus", "wma", "aiff", "aif", "ac3", "eac3", "dts",
+    "alac", "amr", "caf", "mka", "mp2", "wv", "ape", "tta",
 ];
 pub const IMAGE_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "gif", "avif",
+    "png", "jpg", "jpeg", "webp", "gif", "avif", "apng", "bmp", "tiff", "tif", "tga", "ico",
+    "jxl", "exr", "hdr", "heic", "heif",
 ];
+pub const SUBTITLE_EXTENSIONS: &[&str] = &["srt", "ass", "ssa", "vtt", "lrc", "sub"];
 
-/// Checks whether a file path has a recognized video, audio, or image extension.
+/// Checks whether a file path has a recognized video, audio, image, or subtitle extension.
 pub fn is_supported_media_extension(path: &Path) -> bool {
     let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
         return false;
@@ -26,6 +32,54 @@ pub fn is_supported_media_extension(path: &Path) -> bool {
     VIDEO_EXTENSIONS.contains(&lower.as_str())
         || AUDIO_EXTENSIONS.contains(&lower.as_str())
         || IMAGE_EXTENSIONS.contains(&lower.as_str())
+        || SUBTITLE_EXTENSIONS.contains(&lower.as_str())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StoredPreferences {
+    language: Language,
+}
+
+/// Returns the user preference JSON path under `%APPDATA%\vibe-ffmpeg\preferences.json`.
+pub fn preferences_file_path() -> PathBuf {
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        PathBuf::from(appdata)
+            .join("vibe-ffmpeg")
+            .join("preferences.json")
+    } else {
+        std::env::temp_dir().join("vibe-ffmpeg-preferences.json")
+    }
+}
+
+/// Persists UI language preference to `path` cleanly.
+pub fn save_language_to_path(lang: Language, path: &Path) -> Result<(), String> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed creating preference directory: {e}"))?;
+    }
+    let payload = StoredPreferences { language: lang };
+    let json = serde_json::to_string_pretty(&payload)
+        .map_err(|e| format!("Failed serializing preferences: {e}"))?;
+    fs::write(path, json).map_err(|e| format!("Failed writing preferences: {e}"))
+}
+
+/// Reads UI language preference from `path` if present and valid.
+pub fn load_language_from_path(path: &Path) -> Option<Language> {
+    let raw = fs::read_to_string(path).ok()?;
+    let parsed: StoredPreferences = serde_json::from_str(&raw).ok()?;
+    Some(parsed.language)
+}
+
+/// Loads saved UI language or defaults to English when unavailable.
+pub fn load_saved_language() -> Language {
+    load_language_from_path(&preferences_file_path()).unwrap_or_default()
+}
+
+/// Saves selected UI language across app restarts, ignoring IO errors silently.
+pub fn save_language_preference(lang: Language) {
+    let _ = save_language_to_path(lang, &preferences_file_path());
 }
 
 /// Validates that `input` is an existing regular file without dangerous path artifacts.
@@ -403,5 +457,31 @@ mod tests {
         assert!(validate_trusted_https_url("https://www.gyan.dev/ffmpeg/builds/").is_ok());
         assert!(validate_trusted_https_url("http://www.gyan.dev/ffmpeg/builds/").is_err());
         assert!(validate_trusted_https_url("https://evil.example/payload").is_err());
+    }
+
+    #[test]
+    fn persists_and_reloads_language_preference() {
+        let dir = make_temp_test_dir("lang_pref");
+        let pref_path = dir.join("nested").join("preferences.json");
+
+        assert_eq!(load_language_from_path(&pref_path), None);
+        save_language_to_path(Language::Th, &pref_path).unwrap();
+        assert_eq!(load_language_from_path(&pref_path), Some(Language::Th));
+
+        save_language_to_path(Language::Ja, &pref_path).unwrap();
+        assert_eq!(load_language_from_path(&pref_path), Some(Language::Ja));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn recognizes_expanded_input_and_subtitle_extensions() {
+        for ext in [
+            "rmvb", "heic", "m2ts", "mts", "vob", "dv", "swf", "ape", "caf", "wv", "tta", "tga",
+            "exr", "hdr", "srt", "ass", "vtt", "lrc",
+        ] {
+            let path = PathBuf::from(format!("sample.{ext}"));
+            assert!(is_supported_media_extension(&path), "Missing ext: {ext}");
+        }
     }
 }

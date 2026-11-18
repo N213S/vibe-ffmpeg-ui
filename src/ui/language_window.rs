@@ -1,8 +1,12 @@
 use crate::i18n::{Language, tr};
-use crate::ui::theme::{ACCENT_AMBER, ACCENT_BLUE, BG_CARD, BORDER_SUBTLE, TEXT_MUTED};
-use eframe::egui::{self, Button, CornerRadius, Frame, Label, Margin, RichText, Stroke, TextEdit};
+use crate::security::path_guard::save_language_preference;
+use crate::ui::theme::{ACCENT_AMBER, ACCENT_BLUE, BG_CARD, BG_PANEL, BORDER_SUBTLE, TEXT_MUTED};
+use eframe::egui::{
+    self, Button, CentralPanel, CornerRadius, Frame, Label, Margin, RichText, Stroke, TextEdit,
+    ViewportBuilder, ViewportClass, ViewportId,
+};
 
-/// Renders the searchable, scrollable language selector modal with an AI-translation disclaimer banner.
+/// Renders the searchable, scrollable language selector as an independent native OS window.
 pub fn render_language_window(
     ctx: &egui::Context,
     language: &mut Language,
@@ -14,116 +18,151 @@ pub fn render_language_window(
     }
 
     let t = tr(*language);
-    let mut is_open = *open;
+    let viewport_id = ViewportId::from_hash_of("language_selector_viewport");
+    let builder = ViewportBuilder::default()
+        .with_title(t.language_window_title())
+        .with_inner_size([440.0, 540.0])
+        .with_min_inner_size([360.0, 400.0]);
 
-    egui::Window::new(t.language_window_title())
-        .open(&mut is_open)
-        .collapsible(false)
-        .resizable(false)
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-        .default_width(420.0)
-        .max_width(460.0)
-        .show(ctx, |ui| {
-            ui.add(Label::new(RichText::new(t.language_select_prompt()).size(13.5).strong()).wrap());
-            ui.add_space(4.0);
+    ctx.show_viewport_immediate(viewport_id, builder, |ui, class| {
+        if class == ViewportClass::EmbeddedWindow {
+            let mut embedded_open = *open;
+            egui::Window::new(tr(*language).language_window_title())
+                .open(&mut embedded_open)
+                .collapsible(false)
+                .resizable(true)
+                .default_size([420.0, 480.0])
+                .show(ui.ctx(), |ui| {
+                    render_language_contents(ui, language, open, search_query);
+                });
+            if !embedded_open {
+                *open = false;
+            }
+            return;
+        }
 
-            // Search / filter input by code or native name.
-            ui.horizontal(|ui| {
-                let clear_btn_space = if search_query.is_empty() { 0.0 } else { 28.0 };
-                let input_w = (ui.available_width() - clear_btn_space).max(160.0);
+        CentralPanel::default()
+            .frame(
+                Frame::central_panel(&ui.style())
+                    .fill(BG_PANEL)
+                    .inner_margin(Margin::same(12)),
+            )
+            .show(ui, |ui| {
+                render_language_contents(ui, language, open, search_query);
+            });
+
+        if ui.ctx().input(|i| i.viewport().close_requested()) {
+            *open = false;
+            ui.ctx().request_repaint_of(ViewportId::ROOT);
+        }
+    });
+}
+
+fn render_language_contents(
+    ui: &mut egui::Ui,
+    language: &mut Language,
+    open: &mut bool,
+    search_query: &mut String,
+) {
+    let t = tr(*language);
+
+    ui.add(Label::new(RichText::new(t.language_select_prompt()).size(13.5).strong()).wrap());
+    ui.add_space(4.0);
+
+    ui.horizontal(|ui| {
+        let clear_btn_space = if search_query.is_empty() { 0.0 } else { 28.0 };
+        let input_w = (ui.available_width() - clear_btn_space).max(160.0);
+        ui.add(
+            TextEdit::singleline(search_query)
+                .desired_width(input_w)
+                .hint_text(t.language_search_hint()),
+        );
+        if !search_query.is_empty() && ui.small_button("×").clicked() {
+            search_query.clear();
+        }
+    });
+
+    ui.add_space(6.0);
+
+    let scroll_max_h = (ui.available_height() - 125.0).max(160.0).min(340.0);
+    egui::ScrollArea::vertical()
+        .max_height(scroll_max_h)
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            let mut matched = 0usize;
+            for &candidate in Language::ALL {
+                if !candidate.matches_filter(search_query) {
+                    continue;
+                }
+                matched += 1;
+                let selected = *language == candidate;
+                let label = format!(
+                    "{}  —  {}",
+                    candidate.short_code(),
+                    candidate.native_name()
+                );
+                let btn = if selected {
+                    Button::new(RichText::new(label).strong())
+                        .fill(ACCENT_BLUE)
+                        .stroke(Stroke::new(1.0, ACCENT_BLUE))
+                        .min_size(egui::vec2(ui.available_width(), 32.0))
+                } else {
+                    Button::new(label)
+                        .fill(BG_CARD)
+                        .stroke(Stroke::new(1.0, BORDER_SUBTLE))
+                        .min_size(egui::vec2(ui.available_width(), 32.0))
+                };
+
+                if ui.add(btn).clicked() && *language != candidate {
+                    *language = candidate;
+                    save_language_preference(candidate);
+                    ui.ctx().request_repaint_of(ViewportId::ROOT);
+                }
+            }
+
+            if matched == 0 {
+                ui.add_space(12.0);
                 ui.add(
-                    TextEdit::singleline(search_query)
-                        .desired_width(input_w)
-                        .hint_text(t.language_search_hint()),
+                    Label::new(RichText::new(t.language_no_match()).color(TEXT_MUTED)).wrap(),
                 );
-                if !search_query.is_empty() && ui.small_button("×").clicked() {
-                    search_query.clear();
-                }
-            });
-
-            ui.add_space(6.0);
-
-            egui::ScrollArea::vertical()
-                .max_height(320.0)
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    let mut matched = 0usize;
-                    for &candidate in Language::ALL {
-                        if !candidate.matches_filter(search_query) {
-                            continue;
-                        }
-                        matched += 1;
-                        let selected = *language == candidate;
-                        let label = format!(
-                            "{}  —  {}",
-                            candidate.short_code(),
-                            candidate.native_name()
-                        );
-                        let btn = if selected {
-                            Button::new(RichText::new(label).strong())
-                                .fill(ACCENT_BLUE)
-                                .stroke(Stroke::new(1.0, ACCENT_BLUE))
-                                .min_size(egui::vec2(ui.available_width(), 32.0))
-                        } else {
-                            Button::new(label)
-                                .fill(BG_CARD)
-                                .stroke(Stroke::new(1.0, BORDER_SUBTLE))
-                                .min_size(egui::vec2(ui.available_width(), 32.0))
-                        };
-
-                        if ui.add(btn).clicked() {
-                            *language = candidate;
-                        }
-                    }
-
-                    if matched == 0 {
-                        ui.add_space(12.0);
-                        ui.add(
-                            Label::new(RichText::new(t.language_no_match()).color(TEXT_MUTED))
-                                .wrap(),
-                        );
-                    }
-                });
-
-            ui.add_space(10.0);
-
-            let current_t = tr(*language);
-
-            // Prominent orange disclaimer informing the user that all translations were generated by AI.
-            Frame::new()
-                .fill(BG_CARD)
-                .stroke(Stroke::new(1.0, ACCENT_AMBER))
-                .corner_radius(CornerRadius::same(6))
-                .inner_margin(Margin::same(10))
-                .show(ui, |ui| {
-                    ui.add(
-                        Label::new(
-                            RichText::new(current_t.ai_translation_notice())
-                                .size(12.0)
-                                .color(ACCENT_AMBER),
-                        )
-                        .wrap(),
-                    );
-                });
-
-            ui.add_space(8.0);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(current_t.close_btn()).clicked() {
-                    *open = false;
-                }
-                ui.label(
-                    RichText::new(format!(
-                        "{} / {}",
-                        (*language).short_code(),
-                        (*language).native_name()
-                    ))
-                    .size(11.0)
-                    .color(TEXT_MUTED),
-                );
-            });
+            }
         });
 
-    if !is_open {
-        *open = false;
-    }
+    ui.add_space(10.0);
+
+    let current_t = tr(*language);
+
+    // Prominent orange disclaimer informing the user that all translations were generated by AI.
+    Frame::new()
+        .fill(BG_CARD)
+        .stroke(Stroke::new(1.0, ACCENT_AMBER))
+        .corner_radius(CornerRadius::same(6))
+        .inner_margin(Margin::same(10))
+        .show(ui, |ui| {
+            ui.add(
+                Label::new(
+                    RichText::new(current_t.ai_translation_notice())
+                        .size(12.0)
+                        .color(ACCENT_AMBER),
+                )
+                .wrap(),
+            );
+        });
+
+    ui.add_space(8.0);
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        if ui.button(current_t.close_btn()).clicked() {
+            *open = false;
+            ui.ctx().request_repaint_of(ViewportId::ROOT);
+        }
+        ui.label(
+            RichText::new(format!(
+                "{} / {}",
+                (*language).short_code(),
+                (*language).native_name()
+            ))
+            .size(11.0)
+            .color(TEXT_MUTED),
+        );
+    });
 }

@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("Log Diagnostik & Verifikasi"),
     clear_log: Some("Bersihkan Log"),
+    copy_log: Some("Salin Semua"),
+    pop_out_window: Some("Buka Jendela Baru"),
     no_logs_yet: Some("Belum ada log eksekusi."),
     log_init_missing: Some("[Peringatan] ffmpeg.exe / ffprobe.exe tidak ditemukan di PATH."),
     log_init_encoders: Some("[Inisialisasi] Encoder tersedia terdeteksi:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[Cek Pembaruan] Rilis resmi Gyan.dev:"),
     log_update_err: Some("[Gagal Cek Pembaruan]"),
     log_unknown_version: Some("tidak diketahui"),
+
+    mode_subtitle: Some("Subtitle"),
+    file_filter_subtitle: Some("File Subtitle"),
+    from_label: Some("DARI"),
+    to_label: Some("KE"),
+    search_format_hint: Some("Cari format (mis. mp4, webp, srt)..."),
+    image_duration_label: Some("Durasi Gambar (dtk)"),
+    subtitle_section: Some("Ekstraksi & Konversi Subtitle"),
+    subtitle_description: Some("Mengekstrak atau mengonversi aliran subtitle teks (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("File sumber tidak memiliki aliran audio."),
+    incompat_no_subtitle: Some("File sumber tidak memiliki aliran subtitle."),
+    incompat_no_visual_or_audio: Some("File sumber tidak memiliki aliran video, gambar, atau audio."),
+    incompat_no_remux: Some("Sumber tidak mendukung salin aliran langsung (pilih mode Video atau Gambar)."),
 };

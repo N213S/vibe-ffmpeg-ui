@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("Journal de diagnostic et vérification"),
     clear_log: Some("Vider le journal"),
+    copy_log: Some("Tout copier"),
+    pop_out_window: Some("Fenêtre séparée"),
     no_logs_yet: Some("Aucun journal d'exécution pour l'instant."),
     log_init_missing: Some("[Avertissement] ffmpeg.exe / ffprobe.exe introuvable dans PATH."),
     log_init_encoders: Some("[Init] Encodeurs disponibles détectés :"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[Vérif. MàJ] Version officielle Gyan.dev :"),
     log_update_err: Some("[Erreur vérif. MàJ]"),
     log_unknown_version: Some("inconnue"),
+
+    mode_subtitle: Some("Sous-titres"),
+    file_filter_subtitle: Some("Fichiers de sous-titres"),
+    from_label: Some("DE"),
+    to_label: Some("VERS"),
+    search_format_hint: Some("Rechercher un format (ex. mp4, webp, srt)..."),
+    image_duration_label: Some("Durée de l'image (s)"),
+    subtitle_section: Some("Extraction et conversion de sous-titres"),
+    subtitle_description: Some("Extrait ou convertit des pistes de sous-titres texte (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("Le fichier source ne contient aucune piste audio."),
+    incompat_no_subtitle: Some("Le fichier source ne contient aucune piste de sous-titres."),
+    incompat_no_visual_or_audio: Some("Le fichier source ne contient aucun flux vidéo, image ou audio."),
+    incompat_no_remux: Some("La source ne permet pas la copie directe (utilisez Vidéo ou Image)."),
 };

@@ -1,18 +1,20 @@
 use crate::ffmpeg::command_builder::build_command_plan;
 use crate::i18n::{
     Language, audio_channels_label, audio_codec_label, audio_sample_rate_label, container_label,
-    encode_speed_label, fps_label, mode_label, pixel_format_label, preset_label, resolution_label,
-    tr, video_codec_label,
+    encode_speed_label, fps_label, incompatibility_tooltip, mode_label, pixel_format_label,
+    preset_label, resolution_label, tr, video_codec_label,
 };
 use crate::models::config::{
     AudioChannels, AudioCodec, AudioSampleRate, ContainerFormat, ConvertMode, ConversionSettings,
     EncodeSpeed, FpsOption, PixelFormat, PresetProfile, ResolutionOption, VideoCodec,
-    VideoRateControl,
+    VideoRateControl, check_mode_compatibility,
 };
-use crate::models::media::{LocalFfmpegInfo, QueuedFile};
+use crate::models::media::{LocalFfmpegInfo, MediaInfo, QueuedFile};
 use crate::security::path_guard::compose_output_filename;
-use crate::ui::theme::{ACCENT_AMBER, ACCENT_BLUE, TEXT_MUTED, card_frame};
-use eframe::egui::{self, Button, Label, RichText, TextEdit};
+use crate::ui::theme::{
+    ACCENT_AMBER, ACCENT_BLUE, BG_MAIN, BG_PANEL, BORDER_SUBTLE, TEXT_MUTED, card_frame, status_pill,
+};
+use eframe::egui::{self, Button, CornerRadius, Frame, Label, Margin, RichText, Stroke, TextEdit};
 use std::path::Path;
 
 /// Renders the right-hand multi-mode encoding parameters, output naming, safety guards, and command preview.
@@ -24,20 +26,22 @@ pub fn render_settings_panel(
     first_queued: Option<&QueuedFile>,
     locked: bool,
 ) {
+    let first_media = first_queued.and_then(|q| q.media.as_ref());
+
     ui.add_enabled_ui(!locked, |ui| {
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                render_mode_selector(ui, lang, settings);
+                render_mode_selector(ui, lang, settings, first_media);
                 ui.add_space(8.0);
-                render_preset_section(ui, lang, settings);
+                render_preset_section(ui, lang, settings, first_media);
                 ui.add_space(8.0);
-                render_container_output_section(ui, lang, settings);
+                render_container_output_section(ui, lang, settings, first_queued);
                 ui.add_space(8.0);
 
                 match settings.mode {
                     ConvertMode::Video => {
-                        render_video_section(ui, lang, settings, ffmpeg);
+                        render_video_section(ui, lang, settings, ffmpeg, first_media);
                         ui.add_space(8.0);
                         render_audio_section(ui, lang, settings, ffmpeg);
                     }
@@ -46,6 +50,9 @@ pub fn render_settings_panel(
                     }
                     ConvertMode::ImageGif => {
                         render_image_gif_section(ui, lang, settings);
+                    }
+                    ConvertMode::Subtitle => {
+                        render_subtitle_section(ui, lang);
                     }
                     ConvertMode::Remux => {
                         render_remux_section(ui, lang);
@@ -60,7 +67,12 @@ pub fn render_settings_panel(
     });
 }
 
-fn render_mode_selector(ui: &mut egui::Ui, lang: Language, settings: &mut ConversionSettings) {
+fn render_mode_selector(
+    ui: &mut egui::Ui,
+    lang: Language,
+    settings: &mut ConversionSettings,
+    first_media: Option<&MediaInfo>,
+) {
     let t = tr(lang);
     card_frame().show(ui, |ui| {
         ui.label(RichText::new(t.mode_section()).strong());
@@ -68,6 +80,7 @@ fn render_mode_selector(ui: &mut egui::Ui, lang: Language, settings: &mut Conver
         ui.horizontal_wrapped(|ui| {
             for mode in ConvertMode::ALL {
                 let selected = settings.mode == *mode;
+                let compat = check_mode_compatibility(*mode, first_media);
                 let btn = Button::new(RichText::new(mode_label(lang, *mode)).strong())
                     .selected(selected)
                     .fill(if selected {
@@ -75,7 +88,10 @@ fn render_mode_selector(ui: &mut egui::Ui, lang: Language, settings: &mut Conver
                     } else {
                         egui::Color32::from_rgb(35, 42, 58)
                     });
-                if ui.add(btn).clicked() {
+                let resp = ui.add_enabled(compat.is_ok(), btn);
+                if let Err(reason) = compat {
+                    resp.on_disabled_hover_text(incompatibility_tooltip(lang, reason));
+                } else if resp.clicked() {
                     settings.set_mode(*mode);
                 }
             }
@@ -83,7 +99,12 @@ fn render_mode_selector(ui: &mut egui::Ui, lang: Language, settings: &mut Conver
     });
 }
 
-fn render_preset_section(ui: &mut egui::Ui, lang: Language, settings: &mut ConversionSettings) {
+fn render_preset_section(
+    ui: &mut egui::Ui,
+    lang: Language,
+    settings: &mut ConversionSettings,
+    first_media: Option<&MediaInfo>,
+) {
     let t = tr(lang);
     card_frame().show(ui, |ui| {
         ui.label(RichText::new(t.quick_presets()).strong());
@@ -93,19 +114,26 @@ fn render_preset_section(ui: &mut egui::Ui, lang: Language, settings: &mut Conve
             .selected_text(t.choose_preset_placeholder())
             .show_ui(ui, |ui| {
                 for preset in PresetProfile::ALL {
-                    if ui.selectable_label(false, preset_label(lang, *preset)).clicked() {
-                        let out_dir = settings.custom_output_dir.clone();
-                        let prefix = settings.output_prefix.clone();
-                        let suffix = settings.output_suffix.clone();
-                        let overwrite = settings.safety.overwrite_existing;
-                        let deep = settings.safety.deep_decode_verify;
-                        *settings = ConversionSettings::from_preset(*preset);
-                        settings.custom_output_dir = out_dir;
-                        settings.output_prefix = prefix;
-                        settings.output_suffix = suffix;
-                        settings.safety.overwrite_existing = overwrite;
-                        settings.safety.deep_decode_verify = deep;
-                    }
+                    let preview = ConversionSettings::from_preset(*preset);
+                    let compat = check_mode_compatibility(preview.mode, first_media);
+                    ui.add_enabled_ui(compat.is_ok(), |ui| {
+                        let resp = ui.selectable_label(false, preset_label(lang, *preset));
+                        if let Err(reason) = compat {
+                            resp.on_disabled_hover_text(incompatibility_tooltip(lang, reason));
+                        } else if resp.clicked() {
+                            let out_dir = settings.custom_output_dir.clone();
+                            let prefix = settings.output_prefix.clone();
+                            let suffix = settings.output_suffix.clone();
+                            let overwrite = settings.safety.overwrite_existing;
+                            let deep = settings.safety.deep_decode_verify;
+                            *settings = preview;
+                            settings.custom_output_dir = out_dir;
+                            settings.output_prefix = prefix;
+                            settings.output_suffix = suffix;
+                            settings.safety.overwrite_existing = overwrite;
+                            settings.safety.deep_decode_verify = deep;
+                        }
+                    });
                 }
             });
     });
@@ -115,24 +143,64 @@ fn render_container_output_section(
     ui: &mut egui::Ui,
     lang: Language,
     settings: &mut ConversionSettings,
+    first_queued: Option<&QueuedFile>,
 ) {
     let t = tr(lang);
+    let first_media = first_queued.and_then(|q| q.media.as_ref());
+
     card_frame().show(ui, |ui| {
         ui.label(RichText::new(t.format_output_section()).strong());
         ui.add_space(4.0);
 
         ui.label(RichText::new(t.target_format()).size(12.0).color(TEXT_MUTED));
-        let prev = settings.container;
-        egui::ComboBox::from_id_salt("container_combo")
-            .width(ui.available_width())
-            .selected_text(container_label(lang, settings.container))
-            .show_ui(ui, |ui| {
-                for c in settings.mode.containers() {
-                    ui.selectable_value(&mut settings.container, *c, container_label(lang, *c));
-                }
-            });
-        if settings.container != prev {
-            settings.enforce_compatibility();
+        ui.add_space(2.0);
+
+        let from_ext = first_queued
+            .and_then(|q| q.input_path.extension())
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_uppercase())
+            .unwrap_or_else(|| "ANY".to_string());
+
+        ui.horizontal_wrapped(|ui| {
+            status_pill(
+                ui,
+                &format!("{}: {from_ext}", t.from_label()),
+                egui::Color32::from_rgb(100, 116, 139),
+            );
+            ui.label(RichText::new("->").strong().color(TEXT_MUTED));
+
+            let arrow = if settings.format_picker_open { "▲" } else { "▾" };
+            let to_btn = Button::new(
+                RichText::new(format!(
+                    "{}: {} {arrow}",
+                    t.to_label(),
+                    settings.container.short_name()
+                ))
+                .strong(),
+            )
+            .fill(ACCENT_BLUE);
+            if ui
+                .add(to_btn)
+                .on_hover_text(container_label(lang, settings.container))
+                .clicked()
+            {
+                settings.format_picker_open = !settings.format_picker_open;
+            }
+        });
+
+        ui.add_space(2.0);
+        ui.add(
+            Label::new(
+                RichText::new(container_label(lang, settings.container))
+                    .size(11.5)
+                    .color(TEXT_MUTED),
+            )
+            .wrap(),
+        );
+
+        if settings.format_picker_open {
+            ui.add_space(6.0);
+            render_format_picker_popover(ui, lang, settings, first_media);
         }
 
         ui.add_space(6.0);
@@ -176,16 +244,143 @@ fn render_container_output_section(
     });
 }
 
+fn render_format_picker_popover(
+    ui: &mut egui::Ui,
+    lang: Language,
+    settings: &mut ConversionSettings,
+    first_media: Option<&MediaInfo>,
+) {
+    let t = tr(lang);
+    Frame::new()
+        .fill(BG_PANEL)
+        .stroke(Stroke::new(1.0, BORDER_SUBTLE))
+        .corner_radius(CornerRadius::same(6))
+        .inner_margin(Margin::same(8))
+        .show(ui, |ui| {
+            // Search box
+            ui.horizontal(|ui| {
+                let clear_w = if settings.format_search_query.is_empty() {
+                    0.0
+                } else {
+                    26.0
+                };
+                let w = (ui.available_width() - clear_w).max(120.0);
+                ui.add(
+                    TextEdit::singleline(&mut settings.format_search_query)
+                        .desired_width(w)
+                        .hint_text(t.search_format_hint()),
+                );
+                if !settings.format_search_query.is_empty() && ui.small_button("×").clicked() {
+                    settings.format_search_query.clear();
+                }
+            });
+
+            ui.add_space(6.0);
+
+            // Category tabs
+            ui.horizontal_wrapped(|ui| {
+                for mode in ConvertMode::ALL {
+                    let selected = settings.mode == *mode;
+                    let compat = check_mode_compatibility(*mode, first_media);
+                    let tab_btn = Button::new(RichText::new(mode_label(lang, *mode)).size(11.5))
+                        .selected(selected)
+                        .fill(if selected { ACCENT_BLUE } else { BG_MAIN });
+                    let resp = ui.add_enabled(compat.is_ok(), tab_btn);
+                    if let Err(reason) = compat {
+                        resp.on_disabled_hover_text(incompatibility_tooltip(lang, reason));
+                    } else if resp.clicked() {
+                        settings.set_mode(*mode);
+                    }
+                }
+            });
+
+            ui.add_space(6.0);
+
+            let q = settings.format_search_query.trim().to_ascii_lowercase();
+            let candidates: Vec<ContainerFormat> = if q.is_empty() {
+                settings.mode.containers().to_vec()
+            } else {
+                ContainerFormat::ALL
+                    .iter()
+                    .copied()
+                    .filter(|c| {
+                        c.short_name().to_ascii_lowercase().contains(&q)
+                            || c.extension().to_ascii_lowercase().contains(&q)
+                            || container_label(lang, *c).to_ascii_lowercase().contains(&q)
+                    })
+                    .collect()
+            };
+
+            let col_w = ((ui.available_width() - 24.0) / 4.0).max(56.0);
+            egui::ScrollArea::vertical()
+                .max_height(190.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    egui::Grid::new("format_picker_grid")
+                        .num_columns(4)
+                        .spacing(egui::vec2(6.0, 6.0))
+                        .show(ui, |ui| {
+                            for (idx, c) in candidates.iter().enumerate() {
+                                let target_mode = if settings.mode == ConvertMode::Remux
+                                    && ConvertMode::Remux.containers().contains(c)
+                                {
+                                    ConvertMode::Remux
+                                } else {
+                                    c.default_mode()
+                                };
+                                let compat = check_mode_compatibility(target_mode, first_media);
+                                let selected =
+                                    settings.container == *c && settings.mode == target_mode;
+                                let btn = Button::new(RichText::new(c.short_name()).strong().size(11.5))
+                                    .min_size(egui::vec2(col_w, 26.0))
+                                    .fill(if selected { ACCENT_BLUE } else { BG_MAIN });
+
+                                let resp = ui.add_enabled(compat.is_ok(), btn);
+                                if let Err(reason) = compat {
+                                    resp.on_disabled_hover_text(incompatibility_tooltip(
+                                        lang, reason,
+                                    ));
+                                } else {
+                                    let hovered = resp.on_hover_text(container_label(lang, *c));
+                                    if hovered.clicked() {
+                                        if settings.mode != target_mode {
+                                            settings.set_mode(target_mode);
+                                        }
+                                        settings.container = *c;
+                                        settings.enforce_compatibility();
+                                        settings.format_picker_open = false;
+                                        settings.format_search_query.clear();
+                                    }
+                                }
+
+                                if (idx + 1) % 4 == 0 {
+                                    ui.end_row();
+                                }
+                            }
+                        });
+                });
+        });
+}
+
 fn render_video_section(
     ui: &mut egui::Ui,
     lang: Language,
     settings: &mut ConversionSettings,
     ffmpeg: &LocalFfmpegInfo,
+    first_media: Option<&MediaInfo>,
 ) {
     let t = tr(lang);
     card_frame().show(ui, |ui| {
         ui.label(RichText::new(t.video_params_section()).strong());
         ui.add_space(4.0);
+
+        if first_media.is_some_and(|m| m.is_still_image && !m.has_audio) {
+            ui.add(
+                egui::Slider::new(&mut settings.image_to_video_duration_secs, 1..=60)
+                    .text(t.image_duration_label()),
+            );
+            ui.add_space(6.0);
+        }
 
         ui.label(RichText::new(t.video_codec()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("vcodec_combo")
@@ -331,8 +526,10 @@ fn render_image_gif_section(ui: &mut egui::Ui, lang: Language, settings: &mut Co
             ui.add_space(4.0);
         }
 
-        let is_animated = settings.container == ContainerFormat::Gif
-            || (settings.container == ContainerFormat::Webp && settings.image_gif.webp_animated);
+        let is_animated = matches!(
+            settings.container,
+            ContainerFormat::Gif | ContainerFormat::Apng
+        ) || (settings.container == ContainerFormat::Webp && settings.image_gif.webp_animated);
 
         if is_animated {
             ui.add(egui::Slider::new(&mut settings.image_gif.fps, 1..=30).text(t.fps_label()));
@@ -379,6 +576,22 @@ fn render_image_gif_section(ui: &mut egui::Ui, lang: Language, settings: &mut Co
             }
             _ => {}
         }
+    });
+}
+
+fn render_subtitle_section(ui: &mut egui::Ui, lang: Language) {
+    let t = tr(lang);
+    card_frame().show(ui, |ui| {
+        ui.label(RichText::new(t.subtitle_section()).strong());
+        ui.add_space(4.0);
+        ui.add(
+            Label::new(
+                RichText::new(t.subtitle_description())
+                    .size(12.0)
+                    .color(TEXT_MUTED),
+            )
+            .wrap(),
+        );
     });
 }
 
@@ -511,7 +724,7 @@ fn render_safety_section(ui: &mut egui::Ui, lang: Language, settings: &mut Conve
                 t.guard_even_dims(),
             );
         }
-        if settings.mode != ConvertMode::ImageGif {
+        if !matches!(settings.mode, ConvertMode::ImageGif | ConvertMode::Subtitle) {
             ui.checkbox(&mut settings.safety.repair_timestamps, t.guard_repair_ts());
         }
         ui.checkbox(&mut settings.safety.deep_decode_verify, t.guard_deep_verify());

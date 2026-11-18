@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("診斷與驗證紀錄"),
     clear_log: Some("清除紀錄"),
+    copy_log: Some("複製全部"),
+    pop_out_window: Some("彈出獨立視窗"),
     no_logs_yet: Some("尚無執行紀錄。"),
     log_init_missing: Some("[警告] PATH 中找不到 ffmpeg.exe / ffprobe.exe。"),
     log_init_encoders: Some("[初始化] 偵測到可用的編碼器數量:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[更新檢查] Gyan.dev 官方版本:"),
     log_update_err: Some("[更新檢查錯誤]"),
     log_unknown_version: Some("未知"),
+
+    mode_subtitle: Some("字幕"),
+    file_filter_subtitle: Some("字幕檔案"),
+    from_label: Some("來源"),
+    to_label: Some("轉為"),
+    search_format_hint: Some("搜尋格式 (例如 mp4, webp, srt)..."),
+    image_duration_label: Some("靜態圖片時長 (秒)"),
+    subtitle_section: Some("字幕擷取與轉換"),
+    subtitle_description: Some("從影片擷取或轉換文字字幕格式 (SRT, ASS, SSA, VTT, LRC)。"),
+    incompat_no_audio: Some("來源檔案沒有音訊串流。"),
+    incompat_no_subtitle: Some("來源檔案沒有字幕串流。"),
+    incompat_no_visual_or_audio: Some("來源檔案沒有視訊、圖片或音訊串流。"),
+    incompat_no_remux: Some("來源檔案不支援直接串流複製 (請切換至視訊或圖片模式)。"),
 };

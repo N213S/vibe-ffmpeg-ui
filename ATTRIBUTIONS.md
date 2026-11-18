@@ -12,19 +12,19 @@ This document lists the direct and transitive Rust crates compiled into the Wind
 
 | Crate | Version | Purpose | License | Author(s) / Upstream |
 | --- | --- | --- | --- | --- |
-| `eframe` | 0.37.0 | Cross-platform `egui` desktop app framework (`glow`, `system_fonts`, `default_fonts`) | `MIT OR Apache-2.0` | Emil Ernerfeldt ([Repository](https://github.com/emilk/egui/tree/main/crates/eframe)) |
+| `eframe` | 0.37.0 | Cross-platform `egui` desktop app framework (`glow`, `accesskit`, `clipboard`, `default_fonts`, `links`, `system_fonts`) | `MIT OR Apache-2.0` | Emil Ernerfeldt ([Repository](https://github.com/emilk/egui/tree/main/crates/eframe)) |
 | `egui` | 0.37.0 | Immediate-mode GUI library (re-exported via `eframe`) | `MIT OR Apache-2.0` | Emil Ernerfeldt ([Repository](https://github.com/emilk/egui)) |
 | `rfd` | 0.18.0 | Native OS file and folder picker dialogs | `MIT` | Poly ([Repository](https://github.com/PolyMeilex/rfd)) |
-| `ureq` | 3.5.2 | Minimal HTTPS client for official FFmpeg release checks (`native-tls`) | `MIT OR Apache-2.0` | Martin Algesten, Jacob Hoffman-Andrews ([Repository](https://github.com/algesten/ureq)) |
+| `ureq` | 3.5.2 | Minimal HTTPS client for official FFmpeg release checks (`native-tls`, `gzip`) | `MIT OR Apache-2.0` | Martin Algesten, Jacob Hoffman-Andrews ([Repository](https://github.com/algesten/ureq)) |
 | `serde` | 1.0.229 | Serialization/deserialization framework (`derive`) | `MIT OR Apache-2.0` | Erick Tryzelaar, David Tolnay ([Repository](https://github.com/serde-rs/serde)) |
-| `serde_json` | 1.0.154 | JSON parser for `ffprobe` metadata output | `MIT OR Apache-2.0` | Upstream contributors ([Repository](https://github.com/serde-rs/json)) |
+| `serde_json` | 1.0.154 | JSON parser and serializer for `ffprobe` metadata output and saved UI preferences | `MIT OR Apache-2.0` | Upstream contributors ([Repository](https://github.com/serde-rs/json)) |
 
 ---
 
 ## 2. External Runtime Tools (Not Bundled)
 
 - **FFmpeg & ffprobe** ([ffmpeg.org](https://ffmpeg.org/) / Windows builds at [gyan.dev](https://www.gyan.dev/ffmpeg/builds/)) — External CLI executables invoked at runtime as separate OS child processes (`std::process::Command`). Vibe FFmpeg does **not** statically or dynamically link FFmpeg libraries (`libavcodec`, `libavformat`, etc.) and does **not** bundle FFmpeg binaries in its source repository. Depending on your local build configuration, FFmpeg binaries are typically licensed under **LGPL-2.1+** or **GPL-3.0+**.
-- **Windows System Fonts** — On Windows, `src/ui/theme.rs` reads installed system fonts (`Segoe UI`, `Leelawadee UI`, `Tahoma`, `Arial`, `Malgun Gothic`, `Yu Gothic` / `Meiryo`, `Microsoft YaHei`, `Microsoft JhengHei`) locally from `C:\Windows\Fonts` at runtime for multi-script display and does **not** redistribute Microsoft font files.
+- **Windows System Fonts** — On Windows, `src/ui/theme.rs` reads installed system fonts (`Tahoma`, `Leelawadee UI`, `Segoe UI`, `Malgun Gothic`, `Gulim`, `Meiryo`, `Yu Gothic`, `MS Gothic`, `Microsoft YaHei`, `SimSun`, `Microsoft JhengHei`, `MingLiU`, `Arial`) locally from `C:\Windows\Fonts` at runtime for multi-script display and does **not** redistribute Microsoft font files.
 
 ---
 

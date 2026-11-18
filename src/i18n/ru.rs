@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("Журнал диагностики и проверки"),
     clear_log: Some("Очистить журнал"),
+    copy_log: Some("Копировать всё"),
+    pop_out_window: Some("В отдельном окне"),
     no_logs_yet: Some("Записей журнала пока нет."),
     log_init_missing: Some("[Внимание] ffmpeg.exe / ffprobe.exe не найден в PATH."),
     log_init_encoders: Some("[Старт] Обнаружено доступных кодеров:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[Обновления] Официальный релиз Gyan.dev:"),
     log_update_err: Some("[Ошибка проверки обновлений]"),
     log_unknown_version: Some("неизвестно"),
+
+    mode_subtitle: Some("Субтитры"),
+    file_filter_subtitle: Some("Файлы субтитров"),
+    from_label: Some("ИЗ"),
+    to_label: Some("В"),
+    search_format_hint: Some("Поиск формата (напр. mp4, webp, srt)..."),
+    image_duration_label: Some("Длительность кадра (с)"),
+    subtitle_section: Some("Извлечение и конвертация субтитров"),
+    subtitle_description: Some("Извлекает или конвертирует текстовые дорожки субтитров (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("В исходном файле отсутствует аудиодорожка."),
+    incompat_no_subtitle: Some("В исходном файле отсутствует дорожка субтитров."),
+    incompat_no_visual_or_audio: Some("В исходном файле нет видео, изображения или звука."),
+    incompat_no_remux: Some("Исходный файл не поддерживает прямое копирование (используйте Видео или Фото)."),
 };

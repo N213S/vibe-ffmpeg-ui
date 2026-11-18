@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("진단 및 검증 로그"),
     clear_log: Some("로그 지우기"),
+    copy_log: Some("전체 복사"),
+    pop_out_window: Some("새 창으로 열기"),
     no_logs_yet: Some("실행 로그가 아직 없습니다."),
     log_init_missing: Some("[경고] PATH에서 ffmpeg.exe / ffprobe.exe를 찾지 못했습니다."),
     log_init_encoders: Some("[초기화] 사용 가능한 인코더 수:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[업데이트 확인] 공식 Gyan.dev 릴리스:"),
     log_update_err: Some("[업데이트 확인 오류]"),
     log_unknown_version: Some("알 수 없음"),
+
+    mode_subtitle: Some("자막"),
+    file_filter_subtitle: Some("자막 파일"),
+    from_label: Some("원본"),
+    to_label: Some("대상"),
+    search_format_hint: Some("포맷 검색 (예: mp4, webp, srt)..."),
+    image_duration_label: Some("이미지 재생 시간 (초)"),
+    subtitle_section: Some("자막 추출 및 변환"),
+    subtitle_description: Some("텍스트 자막 스트림을 추출하거나 변환합니다 (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("원본 파일에 오디오 스트림이 없습니다."),
+    incompat_no_subtitle: Some("원본 파일에 자막 스트림이 없습니다."),
+    incompat_no_visual_or_audio: Some("원본 파일에 비디오, 이미지 또는 오디오 스트림이 없습니다."),
+    incompat_no_remux: Some("이 파일은 스트림 복사를 지원하지 않습니다 (비디오 또는 이미지 모드를 선택하세요)."),
 };

@@ -9,7 +9,9 @@ pub struct MediaInfo {
     pub bit_rate: Option<u64>,
     pub has_video: bool,
     pub has_audio: bool,
+    pub has_subtitle: bool,
     pub has_text_subtitles: bool,
+    pub is_still_image: bool,
     pub video_codec: Option<String>,
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -18,6 +20,7 @@ pub struct MediaInfo {
     pub audio_codec: Option<String>,
     pub audio_sample_rate: Option<u32>,
     pub audio_channels: Option<u32>,
+    pub subtitle_codec: Option<String>,
 }
 
 impl MediaInfo {

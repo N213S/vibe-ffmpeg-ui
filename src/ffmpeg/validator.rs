@@ -25,7 +25,8 @@ pub fn validate_output_file(
     let info = probe_media(ffprobe_path, temp_output)
         .map_err(|e| format!("Output ffprobe validation failed: {e}"))?;
 
-    let stream_count = usize::from(info.has_video) + usize::from(info.has_audio);
+    let stream_count =
+        usize::from(info.has_video) + usize::from(info.has_audio) + usize::from(info.has_subtitle);
     validate_streams_for_mode(&info, settings, source_media)?;
 
     let mut deep_decode_passed = false;
@@ -39,6 +40,9 @@ pub fn validate_output_file(
             verify_animated_webp_container(temp_output)?;
             deep_decode_passed = true;
             verification_note = String::from("RIFF/ANIM Verified");
+        } else if settings.mode == ConvertMode::Subtitle {
+            deep_decode_passed = true;
+            verification_note = String::from("Header OK");
         } else {
             run_deep_decode_check(ffmpeg_path, temp_output)?;
             deep_decode_passed = true;
@@ -59,17 +63,14 @@ pub fn validate_output_file(
 pub fn validate_streams_for_mode(
     info: &MediaInfo,
     settings: &ConversionSettings,
-    source_media: Option<&MediaInfo>,
+    _source_media: Option<&MediaInfo>,
 ) -> Result<(), String> {
     match settings.mode {
         ConvertMode::Video | ConvertMode::Remux => {
             if !info.has_video && !info.has_audio {
                 return Err("Output contains no valid video or audio streams.".to_string());
             }
-            if settings.mode == ConvertMode::Video
-                && source_media.is_some_and(|m| m.has_video)
-                && !info.has_video
-            {
+            if settings.mode == ConvertMode::Video && !info.has_video {
                 return Err("Expected video stream is missing from converted output.".to_string());
             }
             match info.duration_secs {
@@ -105,6 +106,11 @@ pub fn validate_streams_for_mode(
                 && (info.width.unwrap_or(0) == 0 || info.height.unwrap_or(0) == 0)
             {
                 return Err("Image output reported zero frame dimensions.".to_string());
+            }
+        }
+        ConvertMode::Subtitle => {
+            if !info.has_subtitle {
+                return Err("Subtitle output contains no valid subtitle stream.".to_string());
             }
         }
     }
@@ -208,6 +214,68 @@ mod tests {
 
         let video_settings = ConversionSettings::from_preset(PresetProfile::Mp4UniversalH264);
         assert!(validate_streams_for_mode(&static_img_info, &video_settings, None).is_err());
+
+        let mut sub_settings = ConversionSettings::default();
+        sub_settings.set_mode(ConvertMode::Subtitle);
+        let sub_info = MediaInfo {
+            has_subtitle: true,
+            has_text_subtitles: true,
+            subtitle_codec: Some("subrip".to_string()),
+            ..Default::default()
+        };
+        assert!(validate_streams_for_mode(&sub_info, &sub_settings, None).is_ok());
+        assert!(validate_streams_for_mode(&audio_only_info, &sub_settings, None).is_err());
+    }
+
+    #[test]
+    fn converts_audio_to_mp4_waveform_and_mkv_to_srt_e2e() {
+        let info = discover_local_ffmpeg();
+        let ffmpeg = info.ffmpeg_path.expect("ffmpeg must be on PATH");
+        let ffprobe = info.ffprobe_path.expect("ffprobe must be on PATH");
+        let dir = make_temp_dir("cross_cat");
+
+        // 1. Audio -> MP4 Waveform
+        let wav_in = dir.join("tone.wav");
+        let mut gen_wav = Command::new(&ffmpeg);
+        gen_wav.args(["-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1"]);
+        gen_wav.arg(&wav_in);
+        configure_background_command(&mut gen_wav);
+        assert!(gen_wav.status().unwrap().success());
+
+        let wav_media = probe_media(&ffprobe, &wav_in).unwrap();
+        assert!(!wav_media.has_video && wav_media.has_audio);
+        let mp4_settings = ConversionSettings::from_preset(PresetProfile::Mp4UniversalH264);
+        let mp4_final = build_safe_output_path(&wav_in, None, "", "", None, "mp4", false).unwrap();
+        let mp4_temp = build_temp_staging_path(&mp4_final, 10).unwrap();
+        let mp4_plan = build_command_plan(&mp4_settings, Some(&wav_media), &wav_in, &mp4_temp).unwrap();
+        let mut mp4_cmd = Command::new(&ffmpeg);
+        mp4_cmd.args(&mp4_plan.args);
+        configure_background_command(&mut mp4_cmd);
+        assert!(mp4_cmd.status().unwrap().success());
+        let mp4_rep = validate_output_file(&ffmpeg, &ffprobe, &mp4_temp, &mp4_settings, Some(&wav_media)).unwrap();
+        assert_eq!(mp4_rep.stream_count, 2);
+        assert!(mp4_rep.deep_decode_passed);
+
+        // 2. Subtitle conversion VTT -> SRT
+        let vtt_in = dir.join("captions.vtt");
+        fs::write(&vtt_in, "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nHello Vibe FFmpeg\n").unwrap();
+        let sub_media = probe_media(&ffprobe, &vtt_in).unwrap();
+        assert!(sub_media.has_subtitle);
+
+        let mut srt_settings = ConversionSettings::default();
+        srt_settings.set_mode(ConvertMode::Subtitle);
+        srt_settings.container = ContainerFormat::Srt;
+        let srt_final = build_safe_output_path(&vtt_in, None, "", "", None, "srt", false).unwrap();
+        let srt_temp = build_temp_staging_path(&srt_final, 11).unwrap();
+        let srt_plan = build_command_plan(&srt_settings, Some(&sub_media), &vtt_in, &srt_temp).unwrap();
+        let mut srt_cmd = Command::new(&ffmpeg);
+        srt_cmd.args(&srt_plan.args);
+        configure_background_command(&mut srt_cmd);
+        assert!(srt_cmd.status().unwrap().success());
+        let srt_rep = validate_output_file(&ffmpeg, &ffprobe, &srt_temp, &srt_settings, Some(&sub_media)).unwrap();
+        assert_eq!(srt_rep.stream_count, 1);
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

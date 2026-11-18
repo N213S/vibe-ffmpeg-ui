@@ -2,17 +2,18 @@ use crate::ffmpeg::discovery::discover_local_ffmpeg;
 use crate::ffmpeg::probe::probe_media;
 use crate::ffmpeg::runner::{BatchJobItem, spawn_batch_conversion};
 use crate::i18n::{Language, tr};
-use crate::models::config::ConversionSettings;
+use crate::models::config::{ConversionSettings, ConvertMode, check_mode_compatibility};
 use crate::models::media::{
     FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile, UpdateCheckState, WorkerEvent,
 };
 use crate::net::ffmpeg_update::spawn_update_check;
 use crate::security::path_guard::{
-    AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_supported_media_extension,
-    paths_refer_to_same_file, sanitize_file_stem, validate_input_file,
+    AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, SUBTITLE_EXTENSIONS, VIDEO_EXTENSIONS,
+    is_supported_media_extension, load_saved_language, paths_refer_to_same_file, sanitize_file_stem,
+    validate_input_file,
 };
 use crate::ui::language_window::render_language_window;
-use crate::ui::log_panel::render_log_panel;
+use crate::ui::log_panel::{render_log_panel, render_log_window};
 use crate::ui::queue_panel::render_queue_panel;
 use crate::ui::settings_panel::render_settings_panel;
 use crate::ui::theme::{BG_PANEL, BORDER_SUBTLE, configure_style_and_fonts};
@@ -41,6 +42,7 @@ pub struct FfmpegStudioApp {
     update_state: UpdateCheckState,
     logs: VecDeque<String>,
     log_expanded: bool,
+    log_window_open: bool,
     tx: Sender<WorkerEvent>,
     rx: Receiver<WorkerEvent>,
 }
@@ -50,7 +52,7 @@ impl FfmpegStudioApp {
         configure_style_and_fonts(&cc.egui_ctx);
         let ffmpeg_info = discover_local_ffmpeg();
         let (tx, rx) = mpsc::channel();
-        let language = Language::default();
+        let language = load_saved_language();
         let t = tr(language);
 
         let mut logs = VecDeque::with_capacity(64);
@@ -78,6 +80,7 @@ impl FfmpegStudioApp {
             update_state: UpdateCheckState::Idle,
             logs,
             log_expanded: false,
+            log_window_open: false,
             tx,
             rx,
         }
@@ -151,17 +154,22 @@ impl FfmpegStudioApp {
     fn open_file_picker(&mut self, ctx: &egui::Context) {
         let t = tr(self.language);
         let mut all_media = Vec::with_capacity(
-            VIDEO_EXTENSIONS.len() + AUDIO_EXTENSIONS.len() + IMAGE_EXTENSIONS.len(),
+            VIDEO_EXTENSIONS.len()
+                + AUDIO_EXTENSIONS.len()
+                + IMAGE_EXTENSIONS.len()
+                + SUBTITLE_EXTENSIONS.len(),
         );
         all_media.extend_from_slice(VIDEO_EXTENSIONS);
         all_media.extend_from_slice(AUDIO_EXTENSIONS);
         all_media.extend_from_slice(IMAGE_EXTENSIONS);
+        all_media.extend_from_slice(SUBTITLE_EXTENSIONS);
 
         if let Some(files) = rfd::FileDialog::new()
             .add_filter(t.file_filter_all_media(), &all_media)
             .add_filter(t.file_filter_video(), VIDEO_EXTENSIONS)
             .add_filter(t.file_filter_audio(), AUDIO_EXTENSIONS)
             .add_filter(t.file_filter_image(), IMAGE_EXTENSIONS)
+            .add_filter(t.file_filter_subtitle(), SUBTITLE_EXTENSIONS)
             .add_filter(t.file_filter_all_files(), &["*"])
             .pick_files()
         {
@@ -212,9 +220,19 @@ impl FfmpegStudioApp {
         while let Ok(event) = self.rx.try_recv() {
             match event {
                 WorkerEvent::ProbeCompleted { file_id, result } => {
+                    let first_id = self.queue.first().map(|q| q.id);
                     if let Some(item) = self.queue.iter_mut().find(|q| q.id == file_id) {
                         match result {
                             Ok(info) => {
+                                if first_id == Some(file_id)
+                                    && check_mode_compatibility(self.settings.mode, Some(&info))
+                                        .is_err()
+                                    && let Some(&fallback_mode) = ConvertMode::ALL.iter().find(|&&m| {
+                                        check_mode_compatibility(m, Some(&info)).is_ok()
+                                    })
+                                {
+                                    self.settings.set_mode(fallback_mode);
+                                }
                                 item.media = Some(info);
                                 item.probe_error = None;
                                 if matches!(item.status, FileStatus::Probing) {
@@ -386,20 +404,28 @@ impl eframe::App for FfmpegStudioApp {
         }
 
         let mut clear_log = false;
-        Panel::bottom("bottom_logs")
-            .frame(panel_frame)
-            .show(ui, |ui| {
-                render_log_panel(
-                    ui,
-                    self.language,
-                    &self.logs,
-                    &mut self.log_expanded,
-                    &mut clear_log,
-                );
-            });
-        if clear_log {
-            self.logs.clear();
-        }
+        let bottom_panel = if self.log_expanded {
+            Panel::bottom("bottom_logs_expanded")
+                .resizable(true)
+                .default_size(220.0)
+                .min_size(110.0)
+                .max_size(480.0)
+                .frame(panel_frame)
+        } else {
+            Panel::bottom("bottom_logs_collapsed")
+                .resizable(false)
+                .frame(panel_frame)
+        };
+        bottom_panel.show(ui, |ui| {
+            render_log_panel(
+                ui,
+                self.language,
+                &self.logs,
+                &mut self.log_expanded,
+                &mut self.log_window_open,
+                &mut clear_log,
+            );
+        });
 
         let first_queued = self.queue.first().cloned();
         Panel::right("right_settings")
@@ -446,6 +472,16 @@ impl eframe::App for FfmpegStudioApp {
             &mut self.language_window_open,
             &mut self.language_search,
         );
+        render_log_window(
+            ui.ctx(),
+            self.language,
+            &self.logs,
+            &mut self.log_window_open,
+            &mut clear_log,
+        );
+        if clear_log {
+            self.logs.clear();
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

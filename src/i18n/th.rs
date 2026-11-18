@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("บันทึกการทำงานและการตรวจสอบ"),
     clear_log: Some("ล้างบันทึก"),
+    copy_log: Some("คัดลอกทั้งหมด"),
+    pop_out_window: Some("เปิดหน้าต่างแยก"),
     no_logs_yet: Some("ยังไม่มีบันทึกการทำงาน"),
     log_init_missing: Some("[คำเตือน] ไม่พบ ffmpeg.exe / ffprobe.exe ใน PATH"),
     log_init_encoders: Some("[เริ่มต้น] ตรวจพบตัวเข้ารหัสที่ใช้งานได้:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[เช็กอัปเดต] เวอร์ชันทางการจาก Gyan.dev:"),
     log_update_err: Some("[เช็กอัปเดตผิดพลาด]"),
     log_unknown_version: Some("ไม่ทราบ"),
+
+    mode_subtitle: Some("ซับไตเติล"),
+    file_filter_subtitle: Some("ไฟล์ซับไตเติล"),
+    from_label: Some("จาก"),
+    to_label: Some("เป็น"),
+    search_format_hint: Some("ค้นหาฟอร์แมต (เช่น mp4, webp, srt)..."),
+    image_duration_label: Some("ความยาววิดีโอจากภาพนิ่ง (วินาที)"),
+    subtitle_section: Some("การแยกและแปลงไฟล์ซับไตเติล"),
+    subtitle_description: Some("ดึงซับไตเติลจากวิดีโอหรือแปลงระหว่างฟอร์แมต (SRT, ASS, SSA, VTT, LRC)"),
+    incompat_no_audio: Some("ไฟล์ต้นฉบับไม่มีสตรีมเสียง"),
+    incompat_no_subtitle: Some("ไฟล์ต้นฉบับไม่มีสตรีมซับไตเติล"),
+    incompat_no_visual_or_audio: Some("ไฟล์ต้นฉบับไม่มีสตรีมภาพ วิดีโอ หรือเสียง"),
+    incompat_no_remux: Some("ไฟล์นี้ไม่รองรับการก๊อปปี้สตรีมตรงๆ (กรุณาเลือกโหมดวิดีโอหรือภาพ)"),
 };

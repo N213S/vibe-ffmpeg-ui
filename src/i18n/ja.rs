@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("診断・検証ログ"),
     clear_log: Some("ログを消去"),
+    copy_log: Some("すべてコピー"),
+    pop_out_window: Some("別ウィンドウで開く"),
     no_logs_yet: Some("実行ログはまだありません。"),
     log_init_missing: Some("[警告] PATH上に ffmpeg.exe / ffprobe.exe が見つかりません。"),
     log_init_encoders: Some("[初期化] 利用可能なエンコーダ数:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[更新確認] Gyan.dev 公式リリース:"),
     log_update_err: Some("[更新確認エラー]"),
     log_unknown_version: Some("不明"),
+
+    mode_subtitle: Some("字幕"),
+    file_filter_subtitle: Some("字幕ファイル"),
+    from_label: Some("元"),
+    to_label: Some("先"),
+    search_format_hint: Some("形式を検索 (例: mp4, webp, srt)..."),
+    image_duration_label: Some("静止画の長さ (秒)"),
+    subtitle_section: Some("字幕の抽出と変換"),
+    subtitle_description: Some("テキスト字幕ストリームを抽出または相互変換します (SRT, ASS, SSA, VTT, LRC)。"),
+    incompat_no_audio: Some("入力ファイルに音声ストリームがありません。"),
+    incompat_no_subtitle: Some("入力ファイルに字幕ストリームがありません。"),
+    incompat_no_visual_or_audio: Some("入力ファイルに映像・画像・音声ストリームがありません。"),
+    incompat_no_remux: Some("この入力はストリームコピーできません (動画または画像モードを使用してください)。"),
 };

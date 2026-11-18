@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("Log de diagnóstico e verificação"),
     clear_log: Some("Limpar log"),
+    copy_log: Some("Copiar tudo"),
+    pop_out_window: Some("Abrir janela"),
     no_logs_yet: Some("Nenhum log de execução ainda."),
     log_init_missing: Some("[Aviso] ffmpeg.exe / ffprobe.exe não encontrado no PATH."),
     log_init_encoders: Some("[Início] Codificadores disponíveis detectados:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[Atualização] Versão oficial Gyan.dev:"),
     log_update_err: Some("[Erro na verificação de atualização]"),
     log_unknown_version: Some("desconhecida"),
+
+    mode_subtitle: Some("Legendas"),
+    file_filter_subtitle: Some("Arquivos de legenda"),
+    from_label: Some("DE"),
+    to_label: Some("PARA"),
+    search_format_hint: Some("Buscar formato (ex.: mp4, webp, srt)..."),
+    image_duration_label: Some("Duração da imagem (s)"),
+    subtitle_section: Some("Extração e conversão de legendas"),
+    subtitle_description: Some("Extrai ou converte faixas de legenda em texto (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("O arquivo de origem não possui faixa de áudio."),
+    incompat_no_subtitle: Some("O arquivo de origem não possui faixa de legenda."),
+    incompat_no_visual_or_audio: Some("O arquivo de origem não possui faixa de vídeo, imagem ou áudio."),
+    incompat_no_remux: Some("A origem não suporta cópia direta de fluxo (use Vídeo ou Imagem)."),
 };

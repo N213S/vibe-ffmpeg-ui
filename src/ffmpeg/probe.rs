@@ -34,8 +34,16 @@ struct FfprobeStream {
     pix_fmt: Option<String>,
     r_frame_rate: Option<String>,
     avg_frame_rate: Option<String>,
+    nb_frames: Option<String>,
+    disposition: Option<FfprobeDisposition>,
     sample_rate: Option<String>,
     channels: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct FfprobeDisposition {
+    #[serde(default)]
+    attached_pic: i32,
 }
 
 /// Probes a media file using `ffprobe` and returns parsed stream/format metadata.
@@ -97,12 +105,37 @@ pub fn parse_ffprobe_json(json_str: &str, exit_ok: bool) -> Result<MediaInfo, St
         info.bit_rate = fmt.bit_rate.and_then(|s| s.parse::<u64>().ok());
     }
 
+    let fmt_lower = info.format_name.to_ascii_lowercase();
+    let is_image_demuxer = fmt_lower.contains("image2")
+        || fmt_lower.contains("_pipe")
+        || fmt_lower == "ico"
+        || fmt_lower.contains(",ico");
+
     for stream in parsed.streams {
         let kind = stream.codec_type.as_deref().unwrap_or("");
         match kind {
             "video" if !info.has_video => {
-                // Skip attached album art images? No, keep track unless audio-only container drops it.
                 info.has_video = true;
+                let codec = stream.codec_name.clone().unwrap_or_default();
+                let attached_pic = stream
+                    .disposition
+                    .as_ref()
+                    .is_some_and(|d| d.attached_pic == 1);
+                let is_animated_img_codec = matches!(codec.as_str(), "gif" | "webp" | "apng");
+                let is_static_img_codec = matches!(
+                    codec.as_str(),
+                    "png" | "mjpeg" | "bmp" | "tiff" | "targa" | "ico" | "jpegxl" | "exr" | "hdr"
+                );
+                let single_frame = stream.nb_frames.as_deref() == Some("1");
+                let no_motion_dur = info.duration_secs.unwrap_or(0.0) <= 0.0;
+
+                if attached_pic
+                    || (!is_animated_img_codec
+                        && (is_image_demuxer || (is_static_img_codec && (no_motion_dur || single_frame))))
+                {
+                    info.is_still_image = true;
+                }
+
                 info.video_codec = stream.codec_name;
                 info.width = stream.width;
                 info.height = stream.height;
@@ -122,10 +155,14 @@ pub fn parse_ffprobe_json(json_str: &str, exit_ok: bool) -> Result<MediaInfo, St
                 info.audio_channels = stream.channels;
             }
             "subtitle" => {
+                info.has_subtitle = true;
                 let codec = stream.codec_name.as_deref().unwrap_or("");
+                if info.subtitle_codec.is_none() {
+                    info.subtitle_codec = stream.codec_name.clone();
+                }
                 if matches!(
                     codec,
-                    "subrip" | "srt" | "ass" | "ssa" | "webvtt" | "mov_text" | "text"
+                    "subrip" | "srt" | "ass" | "ssa" | "webvtt" | "mov_text" | "text" | "lrc"
                 ) {
                     info.has_text_subtitles = true;
                 }
@@ -134,8 +171,16 @@ pub fn parse_ffprobe_json(json_str: &str, exit_ok: bool) -> Result<MediaInfo, St
         }
     }
 
-    if !info.has_video && !info.has_audio {
-        return Err("No playable video or audio streams found in file.".to_string());
+    if ["srt", "ass", "webvtt", "lrc", "subviewer", "microdvd"]
+        .iter()
+        .any(|tag| fmt_lower.contains(tag))
+    {
+        info.has_subtitle = true;
+        info.has_text_subtitles = true;
+    }
+
+    if !info.has_video && !info.has_audio && !info.has_subtitle {
+        return Err("No playable video, audio, or subtitle streams found in file.".to_string());
     }
 
     Ok(info)

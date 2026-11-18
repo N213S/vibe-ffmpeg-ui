@@ -1,3 +1,4 @@
+use crate::models::media::MediaInfo;
 use serde::{Deserialize, Serialize};
 
 /// Top-level conversion mode controlling visible parameters, presets, and verification.
@@ -6,11 +7,18 @@ pub enum ConvertMode {
     Video,
     AudioOnly,
     ImageGif,
+    Subtitle,
     Remux,
 }
 
 impl ConvertMode {
-    pub const ALL: &'static [Self] = &[Self::Video, Self::AudioOnly, Self::ImageGif, Self::Remux];
+    pub const ALL: &'static [Self] = &[
+        Self::Video,
+        Self::AudioOnly,
+        Self::ImageGif,
+        Self::Subtitle,
+        Self::Remux,
+    ];
 
     #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
@@ -18,6 +26,7 @@ impl ConvertMode {
             Self::Video => "Video",
             Self::AudioOnly => "Audio Only",
             Self::ImageGif => "Image / GIF",
+            Self::Subtitle => "Subtitle",
             Self::Remux => "Remux (Fast Copy)",
         }
     }
@@ -29,53 +38,308 @@ impl ConvertMode {
                 ContainerFormat::Mkv,
                 ContainerFormat::Mov,
                 ContainerFormat::WebM,
+                ContainerFormat::Avi,
+                ContainerFormat::Flv,
+                ContainerFormat::Ts,
+                ContainerFormat::M2ts,
+                ContainerFormat::Mxf,
+                ContainerFormat::ThreeGp,
+                ContainerFormat::M4v,
+                ContainerFormat::Mpg,
+                ContainerFormat::Mpeg,
+                ContainerFormat::Vob,
+                ContainerFormat::Ogv,
+                ContainerFormat::Wmv,
+                ContainerFormat::Dv,
             ],
             Self::AudioOnly => &[
                 ContainerFormat::Mp3,
-                ContainerFormat::Flac,
                 ContainerFormat::Wav,
+                ContainerFormat::Flac,
+                ContainerFormat::Aac,
                 ContainerFormat::M4a,
-                ContainerFormat::Opus,
                 ContainerFormat::Ogg,
+                ContainerFormat::Opus,
+                ContainerFormat::Wma,
+                ContainerFormat::Aiff,
+                ContainerFormat::Ac3,
+                ContainerFormat::Eac3,
+                ContainerFormat::Dts,
+                ContainerFormat::Alac,
+                ContainerFormat::Amr,
+                ContainerFormat::Caf,
+                ContainerFormat::Mka,
+                ContainerFormat::Mp2,
+                ContainerFormat::Wv,
             ],
             Self::ImageGif => &[
-                ContainerFormat::Gif,
-                ContainerFormat::Webp,
                 ContainerFormat::Png,
                 ContainerFormat::Jpg,
+                ContainerFormat::Webp,
+                ContainerFormat::Gif,
                 ContainerFormat::Avif,
+                ContainerFormat::Apng,
+                ContainerFormat::Bmp,
+                ContainerFormat::Tiff,
+                ContainerFormat::Tga,
+                ContainerFormat::Ico,
+                ContainerFormat::Jxl,
+                ContainerFormat::Exr,
+                ContainerFormat::Hdr,
+            ],
+            Self::Subtitle => &[
+                ContainerFormat::Srt,
+                ContainerFormat::Ass,
+                ContainerFormat::Ssa,
+                ContainerFormat::Vtt,
+                ContainerFormat::Lrc,
             ],
             Self::Remux => &[
                 ContainerFormat::Mp4,
                 ContainerFormat::Mkv,
                 ContainerFormat::Mov,
                 ContainerFormat::WebM,
+                ContainerFormat::Avi,
+                ContainerFormat::Flv,
+                ContainerFormat::Ts,
+                ContainerFormat::M2ts,
+                ContainerFormat::M4v,
+                ContainerFormat::Mka,
             ],
         }
     }
 }
 
-/// Target output container / image format.
+/// Reason why a conversion mode / category is incompatible with the active input media.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncompatibilityReason {
+    NoAudioStream,
+    NoSubtitleStream,
+    NoVisualOrAudioStream,
+    NoRemuxableStream,
+}
+
+/// Evaluates whether `mode` is supported for `media` (returns `Ok(())` when queue is empty / unprobed).
+pub fn check_mode_compatibility(
+    mode: ConvertMode,
+    media: Option<&MediaInfo>,
+) -> Result<(), IncompatibilityReason> {
+    let Some(m) = media else {
+        return Ok(());
+    };
+    match mode {
+        ConvertMode::Video | ConvertMode::ImageGif => {
+            if m.has_video || m.is_still_image || m.has_audio {
+                Ok(())
+            } else {
+                Err(IncompatibilityReason::NoVisualOrAudioStream)
+            }
+        }
+        ConvertMode::AudioOnly => {
+            if m.has_audio {
+                Ok(())
+            } else {
+                Err(IncompatibilityReason::NoAudioStream)
+            }
+        }
+        ConvertMode::Subtitle => {
+            if m.has_subtitle {
+                Ok(())
+            } else {
+                Err(IncompatibilityReason::NoSubtitleStream)
+            }
+        }
+        ConvertMode::Remux => {
+            if (m.has_video && !m.is_still_image) || m.has_audio {
+                Ok(())
+            } else {
+                Err(IncompatibilityReason::NoRemuxableStream)
+            }
+        }
+    }
+}
+
+/// Target output container, image, or subtitle format (53 formats across 4 categories).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ContainerFormat {
+    // Video (17)
     Mp4,
     Mkv,
     Mov,
     WebM,
+    Avi,
+    Flv,
+    Ts,
+    M2ts,
+    Mxf,
+    ThreeGp,
+    M4v,
+    Mpg,
+    Mpeg,
+    Vob,
+    Ogv,
+    Wmv,
+    Dv,
+    // Audio (18)
     Mp3,
-    Flac,
     Wav,
+    Flac,
+    Aac,
     M4a,
-    Opus,
     Ogg,
-    Gif,
-    Webp,
+    Opus,
+    Wma,
+    Aiff,
+    Ac3,
+    Eac3,
+    Dts,
+    Alac,
+    Amr,
+    Caf,
+    Mka,
+    Mp2,
+    Wv,
+    // Image / Animated (13)
     Png,
     Jpg,
+    Webp,
+    Gif,
     Avif,
+    Apng,
+    Bmp,
+    Tiff,
+    Tga,
+    Ico,
+    Jxl,
+    Exr,
+    Hdr,
+    // Subtitle (5)
+    Srt,
+    Ass,
+    Ssa,
+    Vtt,
+    Lrc,
 }
 
 impl ContainerFormat {
+    pub const ALL: &'static [Self] = &[
+        // Video
+        Self::Mp4,
+        Self::Mkv,
+        Self::Mov,
+        Self::WebM,
+        Self::Avi,
+        Self::Flv,
+        Self::Ts,
+        Self::M2ts,
+        Self::Mxf,
+        Self::ThreeGp,
+        Self::M4v,
+        Self::Mpg,
+        Self::Mpeg,
+        Self::Vob,
+        Self::Ogv,
+        Self::Wmv,
+        Self::Dv,
+        // Audio
+        Self::Mp3,
+        Self::Wav,
+        Self::Flac,
+        Self::Aac,
+        Self::M4a,
+        Self::Ogg,
+        Self::Opus,
+        Self::Wma,
+        Self::Aiff,
+        Self::Ac3,
+        Self::Eac3,
+        Self::Dts,
+        Self::Alac,
+        Self::Amr,
+        Self::Caf,
+        Self::Mka,
+        Self::Mp2,
+        Self::Wv,
+        // Image
+        Self::Png,
+        Self::Jpg,
+        Self::Webp,
+        Self::Gif,
+        Self::Avif,
+        Self::Apng,
+        Self::Bmp,
+        Self::Tiff,
+        Self::Tga,
+        Self::Ico,
+        Self::Jxl,
+        Self::Exr,
+        Self::Hdr,
+        // Subtitle
+        Self::Srt,
+        Self::Ass,
+        Self::Ssa,
+        Self::Vtt,
+        Self::Lrc,
+    ];
+
+    pub const fn short_name(self) -> &'static str {
+        match self {
+            Self::Mp4 => "MP4",
+            Self::Mkv => "MKV",
+            Self::Mov => "MOV",
+            Self::WebM => "WEBM",
+            Self::Avi => "AVI",
+            Self::Flv => "FLV",
+            Self::Ts => "TS",
+            Self::M2ts => "M2TS",
+            Self::Mxf => "MXF",
+            Self::ThreeGp => "3GP",
+            Self::M4v => "M4V",
+            Self::Mpg => "MPG",
+            Self::Mpeg => "MPEG",
+            Self::Vob => "VOB",
+            Self::Ogv => "OGV",
+            Self::Wmv => "WMV",
+            Self::Dv => "DV",
+            Self::Mp3 => "MP3",
+            Self::Wav => "WAV",
+            Self::Flac => "FLAC",
+            Self::Aac => "AAC",
+            Self::M4a => "M4A",
+            Self::Ogg => "OGG",
+            Self::Opus => "OPUS",
+            Self::Wma => "WMA",
+            Self::Aiff => "AIFF",
+            Self::Ac3 => "AC3",
+            Self::Eac3 => "EAC3",
+            Self::Dts => "DTS",
+            Self::Alac => "ALAC",
+            Self::Amr => "AMR",
+            Self::Caf => "CAF",
+            Self::Mka => "MKA",
+            Self::Mp2 => "MP2",
+            Self::Wv => "WV",
+            Self::Png => "PNG",
+            Self::Jpg => "JPG",
+            Self::Webp => "WEBP",
+            Self::Gif => "GIF",
+            Self::Avif => "AVIF",
+            Self::Apng => "APNG",
+            Self::Bmp => "BMP",
+            Self::Tiff => "TIFF",
+            Self::Tga => "TGA",
+            Self::Ico => "ICO",
+            Self::Jxl => "JXL",
+            Self::Exr => "EXR",
+            Self::Hdr => "HDR",
+            Self::Srt => "SRT",
+            Self::Ass => "ASS",
+            Self::Ssa => "SSA",
+            Self::Vtt => "VTT",
+            Self::Lrc => "LRC",
+        }
+    }
+
     #[allow(dead_code)]
     pub const fn label(self) -> &'static str {
         match self {
@@ -83,17 +347,55 @@ impl ContainerFormat {
             Self::Mkv => "MKV (Matroska)",
             Self::Mov => "MOV (QuickTime)",
             Self::WebM => "WebM (VP9 / AV1)",
+            Self::Avi => "AVI (Audio Video Interleave)",
+            Self::Flv => "FLV (Flash Video)",
+            Self::Ts => "TS (MPEG Transport Stream)",
+            Self::M2ts => "M2TS (Blu-ray BDAV)",
+            Self::Mxf => "MXF (Broadcast Exchange)",
+            Self::ThreeGp => "3GP (Mobile Video)",
+            Self::M4v => "M4V (Apple MPEG-4 Video)",
+            Self::Mpg => "MPG (MPEG-2 Program)",
+            Self::Mpeg => "MPEG (MPEG-2 Program)",
+            Self::Vob => "VOB (DVD Video Object)",
+            Self::Ogv => "OGV (Ogg Theora Video)",
+            Self::Wmv => "WMV (Windows Media Video)",
+            Self::Dv => "DV (Digital Video)",
             Self::Mp3 => "MP3 (MPEG Audio)",
-            Self::Flac => "FLAC (Lossless Audio)",
             Self::Wav => "WAV (Uncompressed PCM)",
-            Self::M4a => "M4A (AAC Audio)",
-            Self::Opus => "Opus (Ogg Opus)",
+            Self::Flac => "FLAC (Lossless Audio)",
+            Self::Aac => "AAC (ADTS Raw AAC)",
+            Self::M4a => "M4A (AAC / Apple Audio)",
             Self::Ogg => "OGG (Ogg Vorbis)",
-            Self::Gif => "GIF (Animated Palette)",
-            Self::Webp => "WebP (Static / Animated)",
+            Self::Opus => "Opus (Ogg Opus)",
+            Self::Wma => "WMA (Windows Media Audio)",
+            Self::Aiff => "AIFF (Apple Uncompressed)",
+            Self::Ac3 => "AC3 (Dolby Digital)",
+            Self::Eac3 => "EAC3 (Dolby Digital Plus)",
+            Self::Dts => "DTS (Coherent Acoustics)",
+            Self::Alac => "ALAC (Apple Lossless M4A)",
+            Self::Amr => "AMR (Adaptive Multi-Rate)",
+            Self::Caf => "CAF (Core Audio Format)",
+            Self::Mka => "MKA (Matroska Audio)",
+            Self::Mp2 => "MP2 (MPEG Layer II Audio)",
+            Self::Wv => "WV (WavPack Lossless)",
             Self::Png => "PNG (Lossless Image)",
             Self::Jpg => "JPG (JPEG Image)",
+            Self::Webp => "WebP (Static / Animated)",
+            Self::Gif => "GIF (Animated Palette)",
             Self::Avif => "AVIF (AV1 Image)",
+            Self::Apng => "APNG (Animated PNG)",
+            Self::Bmp => "BMP (Windows Bitmap)",
+            Self::Tiff => "TIFF (Tagged Image)",
+            Self::Tga => "TGA (Truevision TARGA)",
+            Self::Ico => "ICO (Windows Icon <=256px)",
+            Self::Jxl => "JXL (JPEG XL Image)",
+            Self::Exr => "EXR (OpenEXR HDR)",
+            Self::Hdr => "HDR (Radiance RGBE)",
+            Self::Srt => "SRT (SubRip Subtitle)",
+            Self::Ass => "ASS (Advanced SubStation)",
+            Self::Ssa => "SSA (SubStation Alpha)",
+            Self::Vtt => "VTT (WebVTT Subtitle)",
+            Self::Lrc => "LRC (Synchronized Lyrics)",
         }
     }
 
@@ -103,48 +405,186 @@ impl ContainerFormat {
             Self::Mkv => "mkv",
             Self::Mov => "mov",
             Self::WebM => "webm",
+            Self::Avi => "avi",
+            Self::Flv => "flv",
+            Self::Ts => "ts",
+            Self::M2ts => "m2ts",
+            Self::Mxf => "mxf",
+            Self::ThreeGp => "3gp",
+            Self::M4v => "m4v",
+            Self::Mpg => "mpg",
+            Self::Mpeg => "mpeg",
+            Self::Vob => "vob",
+            Self::Ogv => "ogv",
+            Self::Wmv => "wmv",
+            Self::Dv => "dv",
             Self::Mp3 => "mp3",
-            Self::Flac => "flac",
             Self::Wav => "wav",
+            Self::Flac => "flac",
+            Self::Aac => "aac",
             Self::M4a => "m4a",
-            Self::Opus => "opus",
             Self::Ogg => "ogg",
-            Self::Gif => "gif",
-            Self::Webp => "webp",
+            Self::Opus => "opus",
+            Self::Wma => "wma",
+            Self::Aiff => "aiff",
+            Self::Ac3 => "ac3",
+            Self::Eac3 => "eac3",
+            Self::Dts => "dts",
+            Self::Alac => "m4a",
+            Self::Amr => "amr",
+            Self::Caf => "caf",
+            Self::Mka => "mka",
+            Self::Mp2 => "mp2",
+            Self::Wv => "wv",
             Self::Png => "png",
             Self::Jpg => "jpg",
+            Self::Webp => "webp",
+            Self::Gif => "gif",
             Self::Avif => "avif",
+            Self::Apng => "apng",
+            Self::Bmp => "bmp",
+            Self::Tiff => "tiff",
+            Self::Tga => "tga",
+            Self::Ico => "ico",
+            Self::Jxl => "jxl",
+            Self::Exr => "exr",
+            Self::Hdr => "hdr",
+            Self::Srt => "srt",
+            Self::Ass => "ass",
+            Self::Ssa => "ssa",
+            Self::Vtt => "vtt",
+            Self::Lrc => "lrc",
         }
     }
 
     pub const fn muxer_name(self) -> &'static str {
         match self {
-            Self::Mp4 => "mp4",
-            Self::Mkv => "matroska",
+            Self::Mp4 | Self::M4v => "mp4",
+            Self::Mkv | Self::Mka => "matroska",
             Self::Mov => "mov",
             Self::WebM => "webm",
+            Self::Avi => "avi",
+            Self::Flv => "flv",
+            Self::Ts | Self::M2ts => "mpegts",
+            Self::Mxf => "mxf",
+            Self::ThreeGp => "3gp",
+            Self::Mpg | Self::Mpeg => "mpeg",
+            Self::Vob => "vob",
+            Self::Ogv | Self::Ogg => "ogg",
+            Self::Wmv | Self::Wma => "asf",
+            Self::Dv => "dv",
             Self::Mp3 => "mp3",
-            Self::Flac => "flac",
             Self::Wav => "wav",
-            Self::M4a => "ipod",
+            Self::Flac => "flac",
+            Self::Aac => "adts",
+            Self::M4a | Self::Alac => "ipod",
             Self::Opus => "opus",
-            Self::Ogg => "ogg",
+            Self::Aiff => "aiff",
+            Self::Ac3 => "ac3",
+            Self::Eac3 => "eac3",
+            Self::Dts => "dts",
+            Self::Amr => "amr",
+            Self::Caf => "caf",
+            Self::Mp2 => "mp2",
+            Self::Wv => "wv",
             Self::Gif => "gif",
             Self::Webp => "webp",
-            Self::Png | Self::Jpg => "image2",
+            Self::Apng => "apng",
+            Self::Ico => "ico",
             Self::Avif => "avif",
+            Self::Png
+            | Self::Jpg
+            | Self::Bmp
+            | Self::Tiff
+            | Self::Tga
+            | Self::Jxl
+            | Self::Exr
+            | Self::Hdr => "image2",
+            Self::Srt => "srt",
+            Self::Ass | Self::Ssa => "ass",
+            Self::Vtt => "webvtt",
+            Self::Lrc => "lrc",
+        }
+    }
+
+    pub const fn default_mode(self) -> ConvertMode {
+        match self {
+            Self::Mp4
+            | Self::Mkv
+            | Self::Mov
+            | Self::WebM
+            | Self::Avi
+            | Self::Flv
+            | Self::Ts
+            | Self::M2ts
+            | Self::Mxf
+            | Self::ThreeGp
+            | Self::M4v
+            | Self::Mpg
+            | Self::Mpeg
+            | Self::Vob
+            | Self::Ogv
+            | Self::Wmv
+            | Self::Dv => ConvertMode::Video,
+            Self::Mp3
+            | Self::Wav
+            | Self::Flac
+            | Self::Aac
+            | Self::M4a
+            | Self::Ogg
+            | Self::Opus
+            | Self::Wma
+            | Self::Aiff
+            | Self::Ac3
+            | Self::Eac3
+            | Self::Dts
+            | Self::Alac
+            | Self::Amr
+            | Self::Caf
+            | Self::Mka
+            | Self::Mp2
+            | Self::Wv => ConvertMode::AudioOnly,
+            Self::Png
+            | Self::Jpg
+            | Self::Webp
+            | Self::Gif
+            | Self::Avif
+            | Self::Apng
+            | Self::Bmp
+            | Self::Tiff
+            | Self::Tga
+            | Self::Ico
+            | Self::Jxl
+            | Self::Exr
+            | Self::Hdr => ConvertMode::ImageGif,
+            Self::Srt | Self::Ass | Self::Ssa | Self::Vtt | Self::Lrc => ConvertMode::Subtitle,
         }
     }
 
     pub const fn is_image_or_gif(self) -> bool {
-        matches!(
-            self,
-            Self::Gif | Self::Webp | Self::Png | Self::Jpg | Self::Avif
-        )
+        matches!(self.default_mode(), ConvertMode::ImageGif)
+    }
+
+    pub const fn is_subtitle(self) -> bool {
+        matches!(self.default_mode(), ConvertMode::Subtitle)
     }
 
     pub const fn supports_faststart(self) -> bool {
-        matches!(self, Self::Mp4 | Self::Mov | Self::M4a)
+        matches!(
+            self,
+            Self::Mp4 | Self::Mov | Self::M4a | Self::M4v | Self::Alac | Self::ThreeGp
+        )
+    }
+
+    pub const fn subtitle_codec_name(self) -> &'static str {
+        match self {
+            Self::Srt => "srt",
+            Self::Ass => "ass",
+            Self::Ssa => "ssa",
+            Self::Vtt => "webvtt",
+            Self::Lrc => "subrip",
+            _ => "srt",
+        }
     }
 }
 
@@ -156,6 +596,10 @@ pub enum VideoCodec {
     Libx265,
     LibSvtAv1,
     LibVpxVp9,
+    Mpeg2Video,
+    LibTheora,
+    Wmv2,
+    DvVideo,
     H264Nvenc,
     HevcNvenc,
     Av1Nvenc,
@@ -171,6 +615,10 @@ impl VideoCodec {
         Self::Libx265,
         Self::LibSvtAv1,
         Self::LibVpxVp9,
+        Self::Mpeg2Video,
+        Self::LibTheora,
+        Self::Wmv2,
+        Self::DvVideo,
         Self::H264Nvenc,
         Self::HevcNvenc,
         Self::Av1Nvenc,
@@ -188,6 +636,10 @@ impl VideoCodec {
             Self::Libx265 => "libx265",
             Self::LibSvtAv1 => "libsvtav1",
             Self::LibVpxVp9 => "libvpx-vp9",
+            Self::Mpeg2Video => "mpeg2video",
+            Self::LibTheora => "libtheora",
+            Self::Wmv2 => "wmv2",
+            Self::DvVideo => "dvvideo",
             Self::H264Nvenc => "h264_nvenc",
             Self::HevcNvenc => "hevc_nvenc",
             Self::Av1Nvenc => "av1_nvenc",
@@ -206,6 +658,10 @@ impl VideoCodec {
             Self::Libx265 => "H.265 / HEVC (libx265)",
             Self::LibSvtAv1 => "AV1 (libsvtav1)",
             Self::LibVpxVp9 => "VP9 (libvpx-vp9)",
+            Self::Mpeg2Video => "MPEG-2 Video (mpeg2video)",
+            Self::LibTheora => "Theora (libtheora)",
+            Self::Wmv2 => "Windows Media Video 8 (wmv2)",
+            Self::DvVideo => "DV Video (dvvideo)",
             Self::H264Nvenc => "H.264 NVIDIA (h264_nvenc)",
             Self::HevcNvenc => "HEVC NVIDIA (hevc_nvenc)",
             Self::Av1Nvenc => "AV1 NVIDIA (av1_nvenc)",
@@ -223,14 +679,39 @@ impl VideoCodec {
         )
     }
 
+    pub const fn is_h264(self) -> bool {
+        matches!(
+            self,
+            Self::Libx264 | Self::H264Nvenc | Self::H264Amf | Self::H264Qsv
+        )
+    }
+
     pub const fn is_compatible_with(self, container: ContainerFormat) -> bool {
         match container {
             ContainerFormat::Mkv => true,
-            ContainerFormat::Mp4 | ContainerFormat::Mov => !matches!(self, Self::LibVpxVp9),
-            ContainerFormat::WebM => matches!(
-                self,
-                Self::LibVpxVp9 | Self::LibSvtAv1 | Self::Av1Nvenc | Self::Copy
-            ),
+            ContainerFormat::Mp4 | ContainerFormat::Mov | ContainerFormat::M4v => {
+                self.is_h264()
+                    || self.is_hevc()
+                    || matches!(self, Self::LibSvtAv1 | Self::Av1Nvenc | Self::Mpeg2Video | Self::Copy)
+            }
+            ContainerFormat::WebM => {
+                matches!(self, Self::LibVpxVp9 | Self::LibSvtAv1 | Self::Av1Nvenc | Self::Copy)
+            }
+            ContainerFormat::Avi => {
+                self.is_h264() || matches!(self, Self::Mpeg2Video | Self::Wmv2 | Self::Copy)
+            }
+            ContainerFormat::Flv => self.is_h264() || matches!(self, Self::Copy),
+            ContainerFormat::Ts | ContainerFormat::M2ts => {
+                self.is_h264() || self.is_hevc() || matches!(self, Self::Mpeg2Video | Self::Copy)
+            }
+            ContainerFormat::Mxf => matches!(self, Self::Mpeg2Video | Self::Copy) || self.is_h264(),
+            ContainerFormat::ThreeGp => self.is_h264() || matches!(self, Self::Copy),
+            ContainerFormat::Mpg | ContainerFormat::Mpeg | ContainerFormat::Vob => {
+                matches!(self, Self::Mpeg2Video | Self::Copy)
+            }
+            ContainerFormat::Ogv => matches!(self, Self::LibTheora | Self::Copy),
+            ContainerFormat::Wmv => matches!(self, Self::Wmv2 | Self::Copy),
+            ContainerFormat::Dv => matches!(self, Self::DvVideo),
             _ => false,
         }
     }
@@ -245,6 +726,14 @@ pub enum AudioCodec {
     LibVorbis,
     Flac,
     PcmS16le,
+    Mp2,
+    Wmav2,
+    Ac3,
+    Eac3,
+    Dts,
+    Alac,
+    AmrNb,
+    WavPack,
     Copy,
     None,
 }
@@ -257,6 +746,14 @@ impl AudioCodec {
         Self::LibVorbis,
         Self::Flac,
         Self::PcmS16le,
+        Self::Mp2,
+        Self::Wmav2,
+        Self::Ac3,
+        Self::Eac3,
+        Self::Dts,
+        Self::Alac,
+        Self::AmrNb,
+        Self::WavPack,
         Self::Copy,
         Self::None,
     ];
@@ -269,6 +766,14 @@ impl AudioCodec {
             Self::LibVorbis => "libvorbis",
             Self::Flac => "flac",
             Self::PcmS16le => "pcm_s16le",
+            Self::Mp2 => "mp2",
+            Self::Wmav2 => "wmav2",
+            Self::Ac3 => "ac3",
+            Self::Eac3 => "eac3",
+            Self::Dts => "dca",
+            Self::Alac => "alac",
+            Self::AmrNb => "libopencore_amrnb",
+            Self::WavPack => "wavpack",
             Self::Copy => "copy",
             Self::None => "none",
         }
@@ -282,35 +787,92 @@ impl AudioCodec {
             Self::LibMp3Lame => "MP3 (LAME)",
             Self::LibVorbis => "Vorbis (OGG)",
             Self::Flac => "FLAC (Lossless)",
-            Self::PcmS16le => "PCM 16-bit (WAV/MOV)",
+            Self::PcmS16le => "PCM 16-bit (Uncompressed)",
+            Self::Mp2 => "MP2 (MPEG Audio Layer II)",
+            Self::Wmav2 => "WMA v2 (Windows Media)",
+            Self::Ac3 => "AC-3 (Dolby Digital)",
+            Self::Eac3 => "E-AC-3 (Dolby Digital Plus)",
+            Self::Dts => "DTS (dca)",
+            Self::Alac => "ALAC (Apple Lossless)",
+            Self::AmrNb => "AMR-NB (8kHz Mono)",
+            Self::WavPack => "WavPack (Lossless)",
             Self::Copy => "Stream Copy (No Re-encode)",
             Self::None => "Mute (Strip Audio -an)",
         }
     }
 
     pub const fn is_lossless(self) -> bool {
-        matches!(self, Self::Flac | Self::PcmS16le | Self::Copy | Self::None)
+        matches!(
+            self,
+            Self::Flac
+                | Self::PcmS16le
+                | Self::Alac
+                | Self::WavPack
+                | Self::Copy
+                | Self::None
+        )
     }
 
     pub const fn is_compatible_with(self, container: ContainerFormat) -> bool {
         match container {
-            ContainerFormat::Mp4 => matches!(
+            ContainerFormat::Mp4 | ContainerFormat::M4v => matches!(
                 self,
-                Self::Aac | Self::LibMp3Lame | Self::LibOpus | Self::Copy | Self::None
+                Self::Aac
+                    | Self::LibMp3Lame
+                    | Self::LibOpus
+                    | Self::Ac3
+                    | Self::Eac3
+                    | Self::Alac
+                    | Self::Copy
+                    | Self::None
             ),
             ContainerFormat::Mov => matches!(
                 self,
-                Self::Aac | Self::LibMp3Lame | Self::PcmS16le | Self::Copy | Self::None
+                Self::Aac
+                    | Self::LibMp3Lame
+                    | Self::PcmS16le
+                    | Self::Alac
+                    | Self::Ac3
+                    | Self::Copy
+                    | Self::None
             ),
             ContainerFormat::Mkv => true,
-            ContainerFormat::WebM => matches!(self, Self::LibOpus | Self::Copy | Self::None),
+            ContainerFormat::Mka => !matches!(self, Self::None),
+            ContainerFormat::WebM => matches!(self, Self::LibOpus | Self::LibVorbis | Self::Copy | Self::None),
+            ContainerFormat::Avi => matches!(
+                self,
+                Self::Aac | Self::LibMp3Lame | Self::PcmS16le | Self::Ac3 | Self::Mp2 | Self::Copy | Self::None
+            ),
+            ContainerFormat::Flv => matches!(self, Self::Aac | Self::LibMp3Lame | Self::Copy | Self::None),
+            ContainerFormat::Ts | ContainerFormat::M2ts => matches!(
+                self,
+                Self::Aac | Self::Mp2 | Self::Ac3 | Self::Eac3 | Self::LibMp3Lame | Self::Copy | Self::None
+            ),
+            ContainerFormat::Mxf => matches!(self, Self::PcmS16le | Self::Copy | Self::None),
+            ContainerFormat::ThreeGp => matches!(self, Self::Aac | Self::AmrNb | Self::Copy | Self::None),
+            ContainerFormat::Mpg | ContainerFormat::Mpeg | ContainerFormat::Vob => {
+                matches!(self, Self::Mp2 | Self::Ac3 | Self::Copy | Self::None)
+            }
+            ContainerFormat::Ogv => matches!(self, Self::LibVorbis | Self::LibOpus | Self::Copy | Self::None),
+            ContainerFormat::Wmv => matches!(self, Self::Wmav2 | Self::Copy | Self::None),
+            ContainerFormat::Dv => matches!(self, Self::PcmS16le),
             ContainerFormat::Mp3 => matches!(self, Self::LibMp3Lame | Self::Copy),
+            ContainerFormat::Wav | ContainerFormat::Aiff => matches!(self, Self::PcmS16le),
             ContainerFormat::Flac => matches!(self, Self::Flac | Self::Copy),
-            ContainerFormat::Wav => matches!(self, Self::PcmS16le),
-            ContainerFormat::M4a => matches!(self, Self::Aac | Self::Copy),
+            ContainerFormat::Aac => matches!(self, Self::Aac | Self::Copy),
+            ContainerFormat::M4a => matches!(self, Self::Aac | Self::Alac | Self::Copy),
+            ContainerFormat::Alac => matches!(self, Self::Alac),
+            ContainerFormat::Ogg => matches!(self, Self::LibVorbis | Self::LibOpus | Self::Flac | Self::Copy),
             ContainerFormat::Opus => matches!(self, Self::LibOpus | Self::Copy),
-            ContainerFormat::Ogg => matches!(self, Self::LibVorbis | Self::LibOpus | Self::Copy),
-            c if c.is_image_or_gif() => matches!(self, Self::None),
+            ContainerFormat::Wma => matches!(self, Self::Wmav2 | Self::Copy),
+            ContainerFormat::Ac3 => matches!(self, Self::Ac3 | Self::Copy),
+            ContainerFormat::Eac3 => matches!(self, Self::Eac3 | Self::Copy),
+            ContainerFormat::Dts => matches!(self, Self::Dts | Self::Copy),
+            ContainerFormat::Amr => matches!(self, Self::AmrNb),
+            ContainerFormat::Caf => matches!(self, Self::PcmS16le | Self::Alac | Self::Aac | Self::LibOpus),
+            ContainerFormat::Mp2 => matches!(self, Self::Mp2 | Self::Copy),
+            ContainerFormat::Wv => matches!(self, Self::WavPack | Self::Copy),
+            c if c.is_image_or_gif() || c.is_subtitle() => matches!(self, Self::None),
             _ => false,
         }
     }
@@ -633,10 +1195,15 @@ pub struct ConversionSettings {
     pub audio_channels: AudioChannels,
     pub audio_sample_rate: AudioSampleRate,
     pub image_gif: ImageGifSettings,
+    pub image_to_video_duration_secs: u32,
     pub safety: SafetySettings,
     pub output_prefix: String,
     pub output_suffix: String,
     pub custom_output_dir: Option<std::path::PathBuf>,
+    #[serde(skip)]
+    pub format_picker_open: bool,
+    #[serde(skip)]
+    pub format_search_query: String,
 }
 
 impl Default for ConversionSettings {
@@ -645,7 +1212,7 @@ impl Default for ConversionSettings {
     }
 }
 
-/// Curated one-click presets spanning all four `ConvertMode`s.
+/// Curated one-click presets spanning conversion modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PresetProfile {
     Mp4UniversalH264,
@@ -729,10 +1296,13 @@ impl ConversionSettings {
             audio_channels: AudioChannels::Stereo,
             audio_sample_rate: AudioSampleRate::Hz48000,
             image_gif: ImageGifSettings::default(),
+            image_to_video_duration_secs: 5,
             safety: SafetySettings::default(),
             output_prefix: String::new(),
             output_suffix: String::new(),
             custom_output_dir: None,
+            format_picker_open: false,
+            format_search_query: String::new(),
         };
 
         match preset {
@@ -891,12 +1461,24 @@ impl ConversionSettings {
                 if !self.video_codec.is_compatible_with(self.container) {
                     self.video_codec = match self.container {
                         ContainerFormat::WebM => VideoCodec::LibVpxVp9,
+                        ContainerFormat::Mpg | ContainerFormat::Mpeg | ContainerFormat::Vob => {
+                            VideoCodec::Mpeg2Video
+                        }
+                        ContainerFormat::Mxf => VideoCodec::Mpeg2Video,
+                        ContainerFormat::Ogv => VideoCodec::LibTheora,
+                        ContainerFormat::Wmv => VideoCodec::Wmv2,
+                        ContainerFormat::Dv => VideoCodec::DvVideo,
                         _ => VideoCodec::Libx264,
                     };
                 }
                 if !self.audio_codec.is_compatible_with(self.container) {
                     self.audio_codec = match self.container {
-                        ContainerFormat::WebM => AudioCodec::LibOpus,
+                        ContainerFormat::WebM | ContainerFormat::Ogv => AudioCodec::LibOpus,
+                        ContainerFormat::Mpg | ContainerFormat::Mpeg | ContainerFormat::Vob => {
+                            AudioCodec::Mp2
+                        }
+                        ContainerFormat::Mxf | ContainerFormat::Dv => AudioCodec::PcmS16le,
+                        ContainerFormat::Wmv => AudioCodec::Wmav2,
                         _ => AudioCodec::Aac,
                     };
                 }
@@ -905,16 +1487,26 @@ impl ConversionSettings {
                 if !self.audio_codec.is_compatible_with(self.container) {
                     self.audio_codec = match self.container {
                         ContainerFormat::Mp3 => AudioCodec::LibMp3Lame,
+                        ContainerFormat::Wav | ContainerFormat::Aiff => AudioCodec::PcmS16le,
                         ContainerFormat::Flac => AudioCodec::Flac,
-                        ContainerFormat::Wav => AudioCodec::PcmS16le,
-                        ContainerFormat::M4a => AudioCodec::Aac,
-                        ContainerFormat::Opus => AudioCodec::LibOpus,
+                        ContainerFormat::Aac | ContainerFormat::M4a | ContainerFormat::Mka => {
+                            AudioCodec::Aac
+                        }
                         ContainerFormat::Ogg => AudioCodec::LibVorbis,
+                        ContainerFormat::Opus => AudioCodec::LibOpus,
+                        ContainerFormat::Wma => AudioCodec::Wmav2,
+                        ContainerFormat::Ac3 => AudioCodec::Ac3,
+                        ContainerFormat::Eac3 => AudioCodec::Eac3,
+                        ContainerFormat::Dts => AudioCodec::Dts,
+                        ContainerFormat::Alac | ContainerFormat::Caf => AudioCodec::Alac,
+                        ContainerFormat::Amr => AudioCodec::AmrNb,
+                        ContainerFormat::Mp2 => AudioCodec::Mp2,
+                        ContainerFormat::Wv => AudioCodec::WavPack,
                         _ => AudioCodec::LibMp3Lame,
                     };
                 }
             }
-            ConvertMode::ImageGif => {
+            ConvertMode::ImageGif | ConvertMode::Subtitle => {
                 self.audio_codec = AudioCodec::None;
             }
             ConvertMode::Remux => {
@@ -928,6 +1520,95 @@ impl ConversionSettings {
             && self.audio_sample_rate == AudioSampleRate::Hz44100
         {
             self.audio_sample_rate = AudioSampleRate::Hz48000;
+        }
+        // AMR-NB requires mono 8kHz; normalize defaults if selected.
+        if self.audio_codec == AudioCodec::AmrNb {
+            self.audio_channels = AudioChannels::Mono;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stream_compatibility_gating_matches_media_capabilities() {
+        let video_only = MediaInfo {
+            has_video: true,
+            has_audio: false,
+            has_subtitle: false,
+            is_still_image: false,
+            ..Default::default()
+        };
+        assert!(check_mode_compatibility(ConvertMode::Video, Some(&video_only)).is_ok());
+        assert!(check_mode_compatibility(ConvertMode::ImageGif, Some(&video_only)).is_ok());
+        assert!(check_mode_compatibility(ConvertMode::Remux, Some(&video_only)).is_ok());
+        assert_eq!(
+            check_mode_compatibility(ConvertMode::AudioOnly, Some(&video_only)),
+            Err(IncompatibilityReason::NoAudioStream)
+        );
+        assert_eq!(
+            check_mode_compatibility(ConvertMode::Subtitle, Some(&video_only)),
+            Err(IncompatibilityReason::NoSubtitleStream)
+        );
+
+        let audio_only = MediaInfo {
+            has_video: false,
+            has_audio: true,
+            has_subtitle: false,
+            is_still_image: false,
+            ..Default::default()
+        };
+        assert!(check_mode_compatibility(ConvertMode::Video, Some(&audio_only)).is_ok());
+        assert!(check_mode_compatibility(ConvertMode::AudioOnly, Some(&audio_only)).is_ok());
+        assert!(check_mode_compatibility(ConvertMode::ImageGif, Some(&audio_only)).is_ok());
+        assert!(check_mode_compatibility(ConvertMode::Remux, Some(&audio_only)).is_ok());
+        assert_eq!(
+            check_mode_compatibility(ConvertMode::Subtitle, Some(&audio_only)),
+            Err(IncompatibilityReason::NoSubtitleStream)
+        );
+
+        let still_img = MediaInfo {
+            has_video: true,
+            has_audio: false,
+            has_subtitle: false,
+            is_still_image: true,
+            ..Default::default()
+        };
+        assert!(check_mode_compatibility(ConvertMode::Video, Some(&still_img)).is_ok());
+        assert!(check_mode_compatibility(ConvertMode::ImageGif, Some(&still_img)).is_ok());
+        assert_eq!(
+            check_mode_compatibility(ConvertMode::Remux, Some(&still_img)),
+            Err(IncompatibilityReason::NoRemuxableStream)
+        );
+
+        let sub_only = MediaInfo {
+            has_video: false,
+            has_audio: false,
+            has_subtitle: true,
+            ..Default::default()
+        };
+        assert!(check_mode_compatibility(ConvertMode::Subtitle, Some(&sub_only)).is_ok());
+        assert_eq!(
+            check_mode_compatibility(ConvertMode::Video, Some(&sub_only)),
+            Err(IncompatibilityReason::NoVisualOrAudioStream)
+        );
+    }
+
+    #[test]
+    fn every_output_format_maps_to_valid_default_codecs() {
+        for &c in ContainerFormat::ALL {
+            let mut s = ConversionSettings::default();
+            s.set_mode(c.default_mode());
+            s.container = c;
+            s.enforce_compatibility();
+            if c.default_mode() == ConvertMode::Video {
+                assert!(s.video_codec.is_compatible_with(c), "vcodec for {c:?}");
+                assert!(s.audio_codec.is_compatible_with(c), "acodec for {c:?}");
+            } else if c.default_mode() == ConvertMode::AudioOnly {
+                assert!(s.audio_codec.is_compatible_with(c), "acodec for {c:?}");
+            }
         }
     }
 }

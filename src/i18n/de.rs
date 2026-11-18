@@ -198,6 +198,8 @@ pub const RAW: RawTranslations = RawTranslations {
 
     diagnostic_log_title: Some("Diagnose- & Prüfprotokoll"),
     clear_log: Some("Protokoll leeren"),
+    copy_log: Some("Alles kopieren"),
+    pop_out_window: Some("Eigenes Fenster"),
     no_logs_yet: Some("Noch keine Ausführungsprotokolle."),
     log_init_missing: Some("[Warnung] ffmpeg.exe / ffprobe.exe nicht im PATH gefunden."),
     log_init_encoders: Some("[Start] Verfügbare Encoder erkannt:"),
@@ -207,4 +209,17 @@ pub const RAW: RawTranslations = RawTranslations {
     log_update_ok: Some("[Update-Prüfung] Offizielles Gyan.dev Release:"),
     log_update_err: Some("[Fehler bei Update-Prüfung]"),
     log_unknown_version: Some("unbekannt"),
+
+    mode_subtitle: Some("Untertitel"),
+    file_filter_subtitle: Some("Untertiteldateien"),
+    from_label: Some("VON"),
+    to_label: Some("ZU"),
+    search_format_hint: Some("Format suchen (z.B. mp4, webp, srt)..."),
+    image_duration_label: Some("Bilddauer (Sek.)"),
+    subtitle_section: Some("Untertitel-Extraktion & Konvertierung"),
+    subtitle_description: Some("Extrahiert oder konvertiert Text-Untertitelspuren (SRT, ASS, SSA, VTT, LRC)."),
+    incompat_no_audio: Some("Die Quelldatei enthält keine Audiospur."),
+    incompat_no_subtitle: Some("Die Quelldatei enthält keine Untertitelspur."),
+    incompat_no_visual_or_audio: Some("Die Quelldatei enthält weder Video-, Bild- noch Audiospur."),
+    incompat_no_remux: Some("Stream-Kopie nicht möglich (bitte Video oder Bild wählen)."),
 };

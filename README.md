@@ -45,3 +45,9 @@ $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 cargo test
 cargo build --release
 ```
+
+## License & Attributions
+
+- Repository: [github.com/N213S/vibe-ffmpeg-ui](https://github.com/N213S/vibe-ffmpeg-ui)
+- Licensed under the [MIT License](LICENSE).
+- Third-party Rust crates, embedded font licenses, and external tool credits are listed in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).

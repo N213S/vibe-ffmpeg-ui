@@ -8,24 +8,70 @@ Lightweight, native multi-mode desktop GUI for FFmpeg written in Rust (`eframe` 
 
 ![Vibe FFmpeg UI](assets/screenshot.png)
 
-## Quick Start
+## Supported Platforms
 
-1. Make sure **`ffmpeg`** and **`ffprobe`** are available on your system **`PATH`** or placed in the **same folder** next to `ffmpeg-ui.exe` ([official Windows builds](https://www.gyan.dev/ffmpeg/builds/)).
-2. Run `ffmpeg-ui.exe` (or build from source below).
+- **Windows 10 / 11 (64-bit `x86_64`)**: Primary supported and tested platform.
+- **Linux / macOS**: Currently **untested and unsupported** (UI font discovery reads from `C:\Windows\Fonts`, file reveal uses `explorer.exe /select,`, and TLS uses Windows `native-tls` / SChannel).
+
+## Installation & Setup (Windows)
+
+No installer is needed — just `ffmpeg-ui.exe` plus `ffmpeg.exe` and `ffprobe.exe`:
+
+1. **Download Vibe FFmpeg**: Grab `ffmpeg-ui.exe` from the [GitHub Releases](https://github.com/N213S/vibe-ffmpeg-ui/releases) page (or compile from source below).
+2. **Install FFmpeg + ffprobe** *(both binaries are required)* using either option:
+   - **Option A — Portable (Zero `PATH` setup, easiest)**:
+     1. Download an official FFmpeg Windows build from [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/) (recommended: `ffmpeg-release-full.7z`).
+     2. Extract and copy **`ffmpeg.exe`** and **`ffprobe.exe`** (from the `bin\` folder) into the **same folder** next to `ffmpeg-ui.exe`. Vibe FFmpeg checks sibling executables first.
+   - **Option B — System `PATH` (via `winget` or Manual Setup)**:
+     - **Via `winget`**: Run `winget install Gyan.FFmpeg` in PowerShell/Terminal, then **close and reopen** Vibe FFmpeg so it picks up the updated `PATH`.
+     - **Manual `PATH`**: Extract FFmpeg to a folder (e.g. `C:\ffmpeg`), open **Start** -> search **"Edit the system environment variables"** -> **Environment Variables** -> edit **Path** -> add `C:\ffmpeg\bin` -> click **OK**, then relaunch Vibe FFmpeg.
+3. **Bypass Windows SmartScreen (Unsigned Executable Notice)**:
+   - Because `ffmpeg-ui.exe` is an unsigned indie open-source binary without a paid EV code-signing certificate, Windows SmartScreen (*"Windows protected your PC"*) or antivirus heuristics may flag it on first launch.
+   - Make sure you downloaded it from [`N213S/vibe-ffmpeg-ui/releases`](https://github.com/N213S/vibe-ffmpeg-ui/releases), then click **More info** -> **Run anyway** (or inspect the Rust source and build locally with `cargo build --release`).
+
+## Privacy & Offline Guarantee
+
+- **100% Local Processing**: Media probing (`ffprobe`), conversion (`ffmpeg`), atomic temporary staging, and output verification run completely offline on your machine. **No media files, filenames, usage analytics, or telemetry are ever uploaded to any cloud server.**
+- **Minimal Network Usage (Manual Update Check Only)**: The app never phones home on startup. Outbound HTTPS connections occur **only** when you click **Check Update** in the top toolbar, querying strict allowlisted `https://www.gyan.dev/ffmpeg/builds/release-version` and `git-version` endpoints (read limit capped at 2 KB, 8-second timeout via Windows `native-tls`).
 
 ## Features & Architecture
 
 - **Multi-Mode Conversion (`ConvertMode`)**:
   - **Video**: `MP4`, `MKV`, `MOV`, `WebM` with software/hardware encoders (`libx264`, `libx265`, `libsvtav1`, `libvpx-vp9`, NVENC, AMF, QSV), speed presets, CRF/bitrate control, pixel format, scaling, FPS, and audio options (including Mute `-an`).
   - **Audio Only**: `MP3`, `FLAC`, `WAV`, `M4A (AAC)`, `Opus`, `OGG` with automatic `-vn` video stripping, bitrate, sample rate, and channel configuration.
-  - **Image / GIF**: `GIF` (`palettegen` + `paletteuse`), `WebP` (static & animated `libwebp_anim`), `PNG`, `JPG`, and `AVIF` (`libaom-av1 -still-picture 1`) with FPS, aspect-preserving Max Width scaling, and quality/compression controls.
+  - **Image / GIF**: `GIF` (`palettegen` + `paletteuse`), static/animated `WebP` (`libwebp_anim`), `PNG`, `JPG`, and `AVIF` (`libaom-av1 -still-picture 1`) with FPS, aspect-preserving Max Width scaling, and quality/compression controls.
   - **Remux (Fast Copy)**: Container switching (`MP4`, `MKV`, `MOV`, `WebM`) using `-c copy` without re-encoding.
 - **Custom Output Filenames & Collision Safety**:
   - Per-file editable output base name in the queue with auto-synced extension when switching formats, plus optional global Prefix/Suffix.
   - Automatic `_out` / `(N)` collision protection so an active input file is never overwritten in-place.
 - **Atomic Staging & Mode-Aware Verification**:
-  - Stages output to `.<stem>.<pid>_<id>.tmp.<ext>` with explicit `-f <muxer>` flags, verifies streams/duration via `ffprobe` + decode verification (`ffmpeg -v error -xerror -f null -` or `RIFF/WEBP` check for animated WebP) according to `ConvertMode`, and atomically commits only on success.
-- **Official Update Check**: Queries `gyan.dev` release and git version endpoints over HTTPS (`ureq` + Windows `native-tls`).
+  - Stages output to `.<stem>.<pid>_<id>.tmp.<ext>` with explicit `-f <muxer>` flags, verifies streams/duration via `ffprobe` + decode check (`ffmpeg -v error -xerror -f null -` or `RIFF/WEBP` + `ANIM` header check for animated WebP) according to `ConvertMode`, and atomically commits only on success.
+- **14 UI Languages (`src/i18n/`)**:
+  - Supports `EN`, `TH`, `JA`, `ZH-CN`, `ZH-TW`, `KO`, `VI`, `ID`, `ES`, `PT-BR`, `FR`, `DE`, `IT`, and `RU` via a searchable language selector (all translations generated by AI).
+
+## Troubleshooting Failed Conversions
+
+When a job shows a red **Failed** badge, the temporary staging file (`.tmp.<ext>`) is deleted automatically so partial/corrupted files are never kept. Check the exact cause quickly:
+
+1. **Open the Diagnostic Log**: Click **`▶ Diagnostic & Verification Log`** at the bottom-left corner of the window to inspect the exact `[Run]` command and FFmpeg's raw `stderr` error message (also check **Live Complete Command Preview** in the right panel).
+2. **`FFmpeg / ffprobe missing on PATH` (or `ffprobe not found`)**: Both `ffmpeg.exe` and `ffprobe.exe` must be present together in `PATH` or beside `ffmpeg-ui.exe`.
+3. **Hardware encoder fails (`*_nvenc`, `*_amf`, `*_qsv`)**: Drivers or older GPUs may reject certain pixel formats (such as `yuv420p10le`) or settings even when `-encoders` lists them. Switch **Video Codec** to software `H.264 / AVC (libx264)` or `H.265 / HEVC (libx265)` with `yuv420p (8-bit Universal)`.
+4. **Mode / Stream mismatch**:
+   - Creating **Image / GIF** from an audio-only file fails (`Cannot create an image or GIF from an audio-only file`).
+   - Extracting **Audio Only** from a silent video or image fails (`Input file has no audio stream`).
+5. **Remux (`-c copy`) container incompatibility**: Switching containers without re-encoding fails if the source codec is incompatible with the target format (for example, copying `H.264`/`AAC` into `WebM`, which requires `VP9`/`AV1` + `Opus`/`Vorbis`). Try **`MKV`** for remuxing, or switch to **Video** mode to re-encode.
+6. **Subtitle muxing failure in MP4/MOV**: Image-based subtitles (such as Blu-ray PGS or DVD VobSub) cannot convert to `mov_text`. Uncheck **Keep text subtitles** or output to **MKV**.
+7. **Missing codecs in minimal FFmpeg builds**: If `AVIF`, `AV1`, or `WebP` fails with unknown/missing encoder errors, switch to a **full** FFmpeg build from `gyan.dev`.
+8. **File permissions / path issues**: Ensure the selected output folder is writable and not locked by another media player.
+
+## Known Limitations
+
+- **Windows-only tested**: No Linux or macOS verification or prebuilt binaries yet.
+- **No saved settings across restarts**: UI language (resets to English on launch), output folder, prefix/suffix, and encoding parameters are not persisted to disk yet.
+- **Single batch profile**: Queue settings apply globally to all pending items in the batch (only the output filename stem is customizable per file).
+- **Non-Latin glyph alignment quirks**: Minor floating diacritics, tone marks, or alignment glitches may appear in some non-Latin scripts (such as Japanese) due to `egui` text layout limitations; translations across all 14 languages are AI-generated and may contain minor phrasing inaccuracies (no RTL support yet).
+- **Animated WebP decode verification**: FFmpeg's built-in `webp` decoder does not support decoding multi-frame `ANIM` WebP streams, so deep verification validates `RIFF`/`WEBP` + `ANIM` magic bytes for animated WebP outputs.
+- **No timeline editing**: Designed for batch conversion, extraction, image/GIF creation, and remuxing — does not support interactive trimming, cropping UI, or merging multiple files.
 
 ## Modules
 

@@ -135,6 +135,18 @@ pub enum UpdateCheckState {
     Error(String),
 }
 
+/// Status of automatic WinGet FFmpeg installation triggered from the setup window.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum FfmpegInstallState {
+    #[default]
+    Idle,
+    Installing {
+        latest_line: String,
+    },
+    Succeeded,
+    Failed(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct UpdateCheckInfo {
     pub latest_release: String,
@@ -175,6 +187,9 @@ pub enum WorkerEvent {
     LogLine(String),
     BatchFinished,
     UpdateChecked(Result<UpdateCheckInfo, String>),
+    FfmpegInstallProgress(String),
+    FfmpegInstallFinished(Result<(), String>),
+    FfmpegRediscovered(LocalFfmpegInfo),
 }
 
 /// Formats seconds as `HH:MM:SS` or `MM:SS`.

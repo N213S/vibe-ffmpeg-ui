@@ -1,17 +1,20 @@
 use crate::ffmpeg::discovery::discover_local_ffmpeg;
+use crate::ffmpeg::installer::{find_winget_exe, spawn_ffmpeg_rescan, spawn_winget_install};
 use crate::ffmpeg::probe::probe_media;
 use crate::ffmpeg::runner::{BatchJobItem, spawn_batch_conversion};
 use crate::i18n::{Language, tr};
 use crate::models::config::{ConversionSettings, ConvertMode, check_mode_compatibility};
 use crate::models::media::{
-    FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile, UpdateCheckState, WorkerEvent,
+    FfmpegInstallState, FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile, UpdateCheckState,
+    WorkerEvent,
 };
-use crate::net::ffmpeg_update::spawn_update_check;
+use crate::net::ffmpeg_update::{is_remote_newer, spawn_update_check};
 use crate::security::path_guard::{
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, SUBTITLE_EXTENSIONS, VIDEO_EXTENSIONS,
     is_supported_media_extension, load_saved_language, paths_refer_to_same_file, sanitize_file_stem,
     validate_input_file,
 };
+use crate::ui::ffmpeg_setup_window::render_ffmpeg_setup_window;
 use crate::ui::language_window::render_language_window;
 use crate::ui::log_panel::{render_log_panel, render_log_window};
 use crate::ui::queue_panel::render_queue_panel;
@@ -25,12 +28,22 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
+use std::time::{Duration, Instant};
 
 const MAX_LOG_LINES: usize = 400;
+const MAX_INSTALL_LOG_LINES: usize = 120;
+const STARTUP_SETUP_DELAY: Duration = Duration::from_millis(300);
 
 /// Main desktop application state.
 pub struct FfmpegStudioApp {
     ffmpeg_info: LocalFfmpegInfo,
+    winget_available: bool,
+    setup_window_open: bool,
+    focus_setup_once: bool,
+    pending_startup_setup_at: Option<Instant>,
+    startup_frames: u32,
+    install_state: FfmpegInstallState,
+    install_logs: Vec<String>,
     language: Language,
     language_window_open: bool,
     language_search: String,
@@ -51,6 +64,12 @@ impl FfmpegStudioApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         configure_style_and_fonts(&cc.egui_ctx);
         let ffmpeg_info = discover_local_ffmpeg();
+        let winget_available = find_winget_exe().is_some();
+        let pending_startup_setup_at = if ffmpeg_info.is_ready() {
+            None
+        } else {
+            Some(Instant::now())
+        };
         let (tx, rx) = mpsc::channel();
         let language = load_saved_language();
         let t = tr(language);
@@ -69,6 +88,13 @@ impl FfmpegStudioApp {
 
         Self {
             ffmpeg_info,
+            winget_available,
+            setup_window_open: false,
+            focus_setup_once: false,
+            pending_startup_setup_at,
+            startup_frames: 0,
+            install_state: FfmpegInstallState::Idle,
+            install_logs: Vec::new(),
             language,
             language_window_open: false,
             language_search: String::new(),
@@ -309,6 +335,54 @@ impl FfmpegStudioApp {
                         self.update_state = UpdateCheckState::Error(err);
                     }
                 },
+                WorkerEvent::FfmpegInstallProgress(line) => {
+                    if let FfmpegInstallState::Installing {
+                        ref mut latest_line,
+                    } = self.install_state
+                    {
+                        *latest_line = line.clone();
+                    }
+                    if self.install_logs.len() >= MAX_INSTALL_LOG_LINES {
+                        self.install_logs.remove(0);
+                    }
+                    self.install_logs.push(line.clone());
+                    self.push_log(format!("[WinGet] {line}"));
+                }
+                WorkerEvent::FfmpegInstallFinished(res) => match res {
+                    Ok(()) => {
+                        self.install_state = FfmpegInstallState::Succeeded;
+                        self.push_log("[WinGet] Installation completed.".to_string());
+                    }
+                    Err(err) => {
+                        self.push_log(format!("[WinGet Error] {err}"));
+                        self.install_state = FfmpegInstallState::Failed(err);
+                    }
+                },
+                WorkerEvent::FfmpegRediscovered(info) => {
+                    let t = tr(self.language);
+                    if info.is_ready() {
+                        if !info.raw_version_line.is_empty() {
+                            self.push_log(format!("[Init] {}", info.raw_version_line));
+                            self.push_log(format!(
+                                "{} {}",
+                                t.log_init_encoders(),
+                                info.available_encoders.len()
+                            ));
+                        }
+                        if let UpdateCheckState::Completed(ref mut upd) = self.update_state
+                            && upd.local_version.is_none()
+                        {
+                            upd.local_version = info.semantic_version.clone();
+                            upd.update_available = upd
+                                .local_version
+                                .as_deref()
+                                .is_some_and(|l| is_remote_newer(l, &upd.latest_release));
+                        }
+                    } else {
+                        self.push_log(t.log_init_missing().to_string());
+                    }
+                    self.ffmpeg_info = info;
+                }
             }
         }
     }
@@ -341,6 +415,18 @@ impl Drop for FfmpegStudioApp {
 impl eframe::App for FfmpegStudioApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.drain_worker_events();
+        self.startup_frames = self.startup_frames.saturating_add(1);
+        if let Some(started) = self.pending_startup_setup_at {
+            if self.ffmpeg_info.is_ready() {
+                self.pending_startup_setup_at = None;
+            } else if self.startup_frames >= 3 && started.elapsed() >= STARTUP_SETUP_DELAY {
+                self.pending_startup_setup_at = None;
+                self.setup_window_open = true;
+                self.focus_setup_once = true;
+            } else {
+                ui.ctx().request_repaint_after(Duration::from_millis(60));
+            }
+        }
         let hovering = self.handle_drag_drop(ui);
 
         let has_pending_work = self.queue.iter().any(|q| {
@@ -401,6 +487,11 @@ impl eframe::App for FfmpegStudioApp {
             if self.language_window_open {
                 self.language_search.clear();
             }
+        }
+        if top_actions.open_setup {
+            self.pending_startup_setup_at = None;
+            self.setup_window_open = true;
+            self.focus_setup_once = true;
         }
 
         let mut clear_log = false;
@@ -479,6 +570,40 @@ impl eframe::App for FfmpegStudioApp {
             &mut self.log_window_open,
             &mut clear_log,
         );
+        let setup_actions = render_ffmpeg_setup_window(
+            ui.ctx(),
+            self.language,
+            &mut self.setup_window_open,
+            &mut self.focus_setup_once,
+            &self.ffmpeg_info,
+            &self.install_state,
+            &self.install_logs,
+            &self.update_state,
+            self.winget_available,
+        );
+        if setup_actions.install_winget
+            && !matches!(self.install_state, FfmpegInstallState::Installing { .. })
+        {
+            let t = tr(self.language);
+            self.install_logs.clear();
+            self.install_state = FfmpegInstallState::Installing {
+                latest_line: t.setup_winget_installing().to_string(),
+            };
+            spawn_winget_install(self.tx.clone(), ui.ctx().clone());
+        }
+        if setup_actions.check_official
+            && !matches!(self.update_state, UpdateCheckState::Checking)
+        {
+            self.update_state = UpdateCheckState::Checking;
+            spawn_update_check(
+                self.ffmpeg_info.semantic_version.clone(),
+                self.tx.clone(),
+                ui.ctx().clone(),
+            );
+        }
+        if setup_actions.rescan_ffmpeg {
+            spawn_ffmpeg_rescan(self.tx.clone(), ui.ctx().clone());
+        }
         if clear_log {
             self.logs.clear();
         }

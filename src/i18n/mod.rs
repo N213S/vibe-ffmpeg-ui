@@ -411,6 +411,24 @@ define_translations!(
     log_update_ok,
     log_update_err,
     log_unknown_version,
+    // Missing FFmpeg setup window
+    setup_btn,
+    setup_window_title,
+    latest_official_label,
+    setup_missing_intro,
+    setup_ready_banner,
+    setup_winget_title,
+    setup_winget_desc,
+    setup_winget_btn,
+    setup_winget_installing,
+    setup_winget_unavailable,
+    setup_winget_success,
+    setup_official_title,
+    setup_official_desc,
+    setup_check_official_btn,
+    setup_open_download_btn,
+    setup_rescan_btn,
+    setup_official_release_prefix,
 );
 
 const fn raw_table(lang: Language) -> &'static RawTranslations {

@@ -2,7 +2,7 @@ use crate::i18n::{Language, tr};
 use crate::models::media::{LocalFfmpegInfo, UpdateCheckState};
 use crate::net::ffmpeg_update::{OFFICIAL_BUILDS_PAGE, open_trusted_url};
 use crate::ui::theme::{ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, status_pill};
-use eframe::egui::{self, Button, Label, RichText};
+use eframe::egui::{self, Button, Color32, CornerRadius, Label, RichText, Stroke};
 
 /// Actions triggered by top toolbar buttons.
 #[derive(Debug, Default)]
@@ -14,6 +14,7 @@ pub struct TopBarActions {
     pub cancel_batch: bool,
     pub check_updates: bool,
     pub toggle_language: bool,
+    pub open_setup: bool,
 }
 
 /// Renders the header bar: binary status, official update checker, language switcher, and queue actions.
@@ -40,7 +41,24 @@ pub fn render_top_bar(
                 .unwrap_or(t.ffmpeg_detected());
             status_pill(ui, &format!("FFmpeg {ver}"), ACCENT_GREEN);
         } else {
-            status_pill(ui, t.ffmpeg_missing(), ACCENT_RED);
+            let missing_bg =
+                Color32::from_rgba_unmultiplied(ACCENT_RED.r(), ACCENT_RED.g(), ACCENT_RED.b(), 36);
+            let missing_btn = Button::new(
+                RichText::new(format!("{} ({})", t.ffmpeg_missing(), t.setup_btn()))
+                    .size(11.5)
+                    .strong()
+                    .color(ACCENT_RED),
+            )
+            .fill(missing_bg)
+            .stroke(Stroke::new(1.0, ACCENT_RED))
+            .corner_radius(CornerRadius::same(6));
+            if ui
+                .add(missing_btn)
+                .on_hover_text(t.setup_window_title())
+                .clicked()
+            {
+                actions.open_setup = true;
+            }
         }
 
         ui.separator();
@@ -73,6 +91,15 @@ pub fn render_top_bar(
                         ui,
                         &format!("{} {}", t.update_available(), info.latest_release),
                         ACCENT_AMBER,
+                    );
+                    if ui.button(t.official_builds()).clicked() {
+                        let _ = open_trusted_url(OFFICIAL_BUILDS_PAGE);
+                    }
+                } else if info.local_version.is_none() {
+                    status_pill(
+                        ui,
+                        &format!("{} {}", t.latest_official_label(), info.latest_release),
+                        ACCENT_BLUE,
                     );
                     if ui.button(t.official_builds()).clicked() {
                         let _ = open_trusted_url(OFFICIAL_BUILDS_PAGE);

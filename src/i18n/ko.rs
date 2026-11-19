@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("PATH에서 FFmpeg / ffprobe를 찾을 수 없음"),
     check_update: Some("업데이트 확인"),
     checking: Some("확인 중..."),
-    official_source: Some("공식 출처: gyan.dev"),
+    official_source: Some("공식 출처: GitHub"),
     update_available: Some("새 버전 있음:"),
     official_builds: Some("공식 빌드 페이지"),
     up_to_date: Some("최신 버전입니다"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("설정"),
     setup_window_title: Some("FFmpeg 설치 설정"),
-    latest_official_label: Some("공식 최신 버전:"),
     setup_missing_intro: Some("미디어를 분석, 변환 및 검증하려면 ffmpeg.exe와 ffprobe.exe가 모두 필요합니다."),
     setup_ready_banner: Some("FFmpeg 및 ffprobe가 감지되어 사용할 준비가 되었습니다!"),
     setup_winget_title: Some("방법 1: WinGet으로 자동 설치 (Gyan.FFmpeg)"),

@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("FFmpeg / ffprobe не найден в PATH"),
     check_update: Some("Проверить обновления"),
     checking: Some("Проверка..."),
-    official_source: Some("Офиц. источник: gyan.dev"),
+    official_source: Some("Офиц. источник: GitHub"),
     update_available: Some("Доступно обновление:"),
     official_builds: Some("Официальные сборки"),
     up_to_date: Some("Актуальная версия"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("Настроить"),
     setup_window_title: Some("Установка FFmpeg"),
-    latest_official_label: Some("Последняя официальная:"),
     setup_missing_intro: Some("Для анализа, конвертации и проверки файлов необходимы оба исполняемых файла: ffmpeg.exe и ffprobe.exe."),
     setup_ready_banner: Some("FFmpeg и ffprobe обнаружены и готовы к работе!"),
     setup_winget_title: Some("Способ 1: Автоустановка через WinGet (Gyan.FFmpeg)"),

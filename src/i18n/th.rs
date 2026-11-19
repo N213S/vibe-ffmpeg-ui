@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("ไม่พบ FFmpeg / ffprobe ใน PATH"),
     check_update: Some("เช็กอัปเดต"),
     checking: Some("กำลังตรวจสอบ..."),
-    official_source: Some("แหล่งทางการ: gyan.dev"),
+    official_source: Some("แหล่งทางการ: GitHub"),
     update_available: Some("มีเวอร์ชันใหม่:"),
     official_builds: Some("หน้าดาวน์โหลดทางการ"),
     up_to_date: Some("เป็นเวอร์ชันล่าสุดแล้ว"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("ตั้งค่า"),
     setup_window_title: Some("ติดตั้ง & ตั้งค่า FFmpeg"),
-    latest_official_label: Some("เวอร์ชันทางการล่าสุด:"),
     setup_missing_intro: Some("Vibe FFmpeg ต้องใช้ทั้ง ffmpeg.exe และ ffprobe.exe เพื่อวิเคราะห์ แปลงไฟล์ และตรวจสอบความสมบูรณ์"),
     setup_ready_banner: Some("ตรวจพบ FFmpeg และ ffprobe พร้อมใช้งานแล้ว!"),
     setup_winget_title: Some("วิธีที่ 1: ติดตั้งอัตโนมัติผ่าน WinGet (Gyan.FFmpeg)"),

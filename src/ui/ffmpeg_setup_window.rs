@@ -203,18 +203,25 @@ fn render_setup_contents(
                 ui.add_space(8.0);
 
                 ui.horizontal_wrapped(|ui| {
-                    let can_click = winget_available && !is_installing && !ffmpeg.is_ready();
+                    let can_click = winget_available && !is_installing;
+                    let has_ffmpeg_update = matches!(
+                        update_state,
+                        UpdateCheckState::Completed(info) if info.update_available
+                    );
                     let btn_label = if is_installing {
                         t.setup_winget_installing()
                     } else {
                         t.setup_winget_btn()
                     };
-                    let install_btn = Button::new(RichText::new(btn_label).strong())
-                        .fill(if can_click {
+                    let install_btn = Button::new(RichText::new(btn_label).strong()).fill(
+                        if !can_click {
+                            Color32::from_rgb(45, 55, 72)
+                        } else if !ffmpeg.is_ready() || has_ffmpeg_update {
                             ACCENT_BLUE
                         } else {
-                            Color32::from_rgb(45, 55, 72)
-                        });
+                            Color32::from_rgb(35, 42, 58)
+                        },
+                    );
                     if ui.add_enabled(can_click, install_btn).clicked() {
                         actions.install_winget = true;
                         ui.ctx().request_repaint_of(ViewportId::ROOT);
@@ -355,15 +362,29 @@ fn render_setup_contents(
                     UpdateCheckState::Completed(info) => {
                         ui.add_space(6.0);
                         ui.horizontal_wrapped(|ui| {
-                            status_pill(
-                                ui,
-                                &format!(
-                                    "{} {}",
-                                    t.setup_official_release_prefix(),
-                                    info.latest_release
-                                ),
-                                ACCENT_BLUE,
-                            );
+                            if info.update_available {
+                                status_pill(
+                                    ui,
+                                    &format!("{} {}", t.update_available(), info.latest_release),
+                                    ACCENT_AMBER,
+                                );
+                            } else if info.local_version.is_none() {
+                                status_pill(
+                                    ui,
+                                    &format!(
+                                        "{} {}",
+                                        t.setup_official_release_prefix(),
+                                        info.latest_release
+                                    ),
+                                    ACCENT_BLUE,
+                                );
+                            } else {
+                                status_pill(
+                                    ui,
+                                    &format!("{} ({})", t.up_to_date(), info.latest_release),
+                                    ACCENT_GREEN,
+                                );
+                            }
                             if let Some(ref git_ver) = info.latest_git {
                                 ui.label(
                                     RichText::new(format!("git: {git_ver}"))

@@ -414,7 +414,6 @@ define_translations!(
     // Missing FFmpeg setup window
     setup_btn,
     setup_window_title,
-    latest_official_label,
     setup_missing_intro,
     setup_ready_banner,
     setup_winget_title,

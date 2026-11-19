@@ -126,6 +126,26 @@ impl LocalFfmpegInfo {
     }
 }
 
+pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Result of querying official GitHub releases for Vibe FFmpeg itself.
+#[derive(Debug, Clone, Default)]
+pub enum AppUpdateState {
+    #[default]
+    Idle,
+    Checking,
+    Completed(AppUpdateInfo),
+    Error(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct AppUpdateInfo {
+    pub latest_version: String,
+    pub current_version: String,
+    pub release_url: String,
+    pub update_available: bool,
+}
+
 /// Result of querying official Gyan.dev FFmpeg release endpoints.
 #[derive(Debug, Clone)]
 pub enum UpdateCheckState {
@@ -187,6 +207,7 @@ pub enum WorkerEvent {
     LogLine(String),
     BatchFinished,
     UpdateChecked(Result<UpdateCheckInfo, String>),
+    AppUpdateChecked(Result<AppUpdateInfo, String>),
     FfmpegInstallProgress(String),
     FfmpegInstallFinished(Result<(), String>),
     FfmpegRediscovered(LocalFfmpegInfo),

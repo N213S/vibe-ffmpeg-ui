@@ -39,7 +39,7 @@ pub fn check_official_ffmpeg_updates(
     let agent = ureq::Agent::config_builder()
         .tls_config(tls)
         .timeout_global(Some(Duration::from_secs(8)))
-        .user_agent("ffmpeg-ui/0.1.0")
+        .user_agent(concat!("ffmpeg-ui/", env!("CARGO_PKG_VERSION")))
         .build()
         .new_agent();
 

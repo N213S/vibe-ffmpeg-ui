@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("FFmpeg / ffprobe tidak ditemukan di PATH"),
     check_update: Some("Cek Pembaruan"),
     checking: Some("Memeriksa..."),
-    official_source: Some("Sumber resmi: gyan.dev"),
+    official_source: Some("Sumber resmi: GitHub"),
     update_available: Some("Pembaruan tersedia:"),
     official_builds: Some("Unduhan Resmi"),
     up_to_date: Some("Sudah terbaru"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("Pengaturan"),
     setup_window_title: Some("Instalasi FFmpeg"),
-    latest_official_label: Some("Rilis resmi terbaru:"),
     setup_missing_intro: Some("Vibe FFmpeg membutuhkan ffmpeg.exe dan ffprobe.exe untuk memeriksa, mengonversi, dan memverifikasi media."),
     setup_ready_banner: Some("FFmpeg & ffprobe terdeteksi dan siap digunakan!"),
     setup_winget_title: Some("Opsi 1: Instal Otomatis via WinGet (Gyan.FFmpeg)"),

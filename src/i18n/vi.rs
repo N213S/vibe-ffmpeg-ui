@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("Không tìm thấy FFmpeg / ffprobe trên PATH"),
     check_update: Some("Kiểm tra cập nhật"),
     checking: Some("Đang kiểm tra..."),
-    official_source: Some("Nguồn chính thức: gyan.dev"),
+    official_source: Some("Nguồn chính thức: GitHub"),
     update_available: Some("Có bản mới:"),
     official_builds: Some("Trang tải chính thức"),
     up_to_date: Some("Đã mới nhất"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("Cài đặt"),
     setup_window_title: Some("Thiết lập FFmpeg"),
-    latest_official_label: Some("Bản chính thức mới nhất:"),
     setup_missing_intro: Some("Vibe FFmpeg cần cả ffmpeg.exe và ffprobe.exe để kiểm tra, chuyển đổi và xác minh tệp media."),
     setup_ready_banner: Some("Đã phát hiện FFmpeg & ffprobe và sẵn sàng sử dụng!"),
     setup_winget_title: Some("Cách 1: Tự động cài đặt qua WinGet (Gyan.FFmpeg)"),

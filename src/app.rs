@@ -5,9 +5,10 @@ use crate::ffmpeg::runner::{BatchJobItem, spawn_batch_conversion};
 use crate::i18n::{Language, tr};
 use crate::models::config::{ConversionSettings, ConvertMode, check_mode_compatibility};
 use crate::models::media::{
-    FfmpegInstallState, FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile, UpdateCheckState,
-    WorkerEvent,
+    AppUpdateState, FfmpegInstallState, FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile,
+    UpdateCheckState, WorkerEvent,
 };
+use crate::net::app_update::spawn_app_update_check;
 use crate::net::ffmpeg_update::{is_remote_newer, spawn_update_check};
 use crate::security::path_guard::{
     AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, SUBTITLE_EXTENSIONS, VIDEO_EXTENSIONS,
@@ -52,6 +53,7 @@ pub struct FfmpegStudioApp {
     next_file_id: u64,
     is_running: bool,
     cancel_flag: Arc<AtomicBool>,
+    app_update_state: AppUpdateState,
     update_state: UpdateCheckState,
     logs: VecDeque<String>,
     log_expanded: bool,
@@ -103,6 +105,7 @@ impl FfmpegStudioApp {
             next_file_id: 1,
             is_running: false,
             cancel_flag: Arc::new(AtomicBool::new(false)),
+            app_update_state: AppUpdateState::Idle,
             update_state: UpdateCheckState::Idle,
             logs,
             log_expanded: false,
@@ -335,6 +338,20 @@ impl FfmpegStudioApp {
                         self.update_state = UpdateCheckState::Error(err);
                     }
                 },
+                WorkerEvent::AppUpdateChecked(res) => match res {
+                    Ok(info) => {
+                        self.push_log(format!(
+                            "[App Update] GitHub latest: v{} (current: v{})",
+                            info.latest_version, info.current_version
+                        ));
+                        self.app_update_state = AppUpdateState::Completed(info);
+                    }
+                    Err(err) => {
+                        let t = tr(self.language);
+                        self.push_log(format!("{} {err}", t.log_update_err()));
+                        self.app_update_state = AppUpdateState::Error(err);
+                    }
+                },
                 WorkerEvent::FfmpegInstallProgress(line) => {
                     if let FfmpegInstallState::Installing {
                         ref mut latest_line,
@@ -448,7 +465,7 @@ impl eframe::App for FfmpegStudioApp {
                     ui,
                     self.language,
                     &self.ffmpeg_info,
-                    &self.update_state,
+                    &self.app_update_state,
                     self.is_running,
                     has_pending_work,
                     self.queue.len(),
@@ -475,12 +492,8 @@ impl eframe::App for FfmpegStudioApp {
             self.push_log(t.log_batch_cancel().to_string());
         }
         if top_actions.check_updates {
-            self.update_state = UpdateCheckState::Checking;
-            spawn_update_check(
-                self.ffmpeg_info.semantic_version.clone(),
-                self.tx.clone(),
-                ui.ctx().clone(),
-            );
+            self.app_update_state = AppUpdateState::Checking;
+            spawn_app_update_check(self.tx.clone(), ui.ctx().clone());
         }
         if top_actions.toggle_language {
             self.language_window_open = !self.language_window_open;

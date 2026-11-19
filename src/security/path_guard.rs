@@ -7,6 +7,8 @@ const MAX_COLLISION_ATTEMPTS: u32 = 10_000;
 const TRUSTED_HTTPS_PREFIXES: &[&str] = &[
     "https://www.gyan.dev/ffmpeg/",
     "https://ffmpeg.org/",
+    "https://api.github.com/repos/N213S/vibe-ffmpeg-ui/",
+    "https://github.com/N213S/vibe-ffmpeg-ui/",
 ];
 
 pub const VIDEO_EXTENSIONS: &[&str] = &[
@@ -455,7 +457,11 @@ mod tests {
     #[test]
     fn enforces_trusted_https_allowlist() {
         assert!(validate_trusted_https_url("https://www.gyan.dev/ffmpeg/builds/").is_ok());
+        assert!(
+            validate_trusted_https_url("https://github.com/N213S/vibe-ffmpeg-ui/releases").is_ok()
+        );
         assert!(validate_trusted_https_url("http://www.gyan.dev/ffmpeg/builds/").is_err());
+        assert!(validate_trusted_https_url("https://github.com/evil/repo").is_err());
         assert!(validate_trusted_https_url("https://evil.example/payload").is_err());
     }
 

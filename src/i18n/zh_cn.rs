@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("PATH 中未找到 FFmpeg / ffprobe"),
     check_update: Some("检查更新"),
     checking: Some("正在检查..."),
-    official_source: Some("官方源: gyan.dev"),
+    official_source: Some("官方源: GitHub"),
     update_available: Some("发现更新:"),
     official_builds: Some("官方下载页"),
     up_to_date: Some("已是最新版本"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("设置"),
     setup_window_title: Some("FFmpeg 安装设置"),
-    latest_official_label: Some("官方最新版本:"),
     setup_missing_intro: Some("Vibe FFmpeg 需要同时具备 ffmpeg.exe 和 ffprobe.exe 才能检测、转换并校验媒体文件。"),
     setup_ready_banner: Some("已检测到 FFmpeg 与 ffprobe，现已就绪！"),
     setup_winget_title: Some("方式 1: 通过 WinGet 自动安装 (Gyan.FFmpeg)"),

@@ -14,7 +14,7 @@ pub const RAW: RawTranslations = RawTranslations {
     ffmpeg_missing: Some("FFmpeg / ffprobe assente nel PATH"),
     check_update: Some("Verifica aggiornamenti"),
     checking: Some("Verifica in corso..."),
-    official_source: Some("Fonte ufficiale: gyan.dev"),
+    official_source: Some("Fonte ufficiale: GitHub"),
     update_available: Some("Aggiornamento disponibile:"),
     official_builds: Some("Build ufficiali"),
     up_to_date: Some("Aggiornato"),
@@ -225,7 +225,6 @@ pub const RAW: RawTranslations = RawTranslations {
 
     setup_btn: Some("Configura"),
     setup_window_title: Some("Configurazione FFmpeg"),
-    latest_official_label: Some("Ultima versione ufficiale:"),
     setup_missing_intro: Some("Vibe FFmpeg richiede sia ffmpeg.exe che ffprobe.exe per analizzare, convertire e verificare i file multimediali."),
     setup_ready_banner: Some("FFmpeg e ffprobe rilevati e pronti all'uso!"),
     setup_winget_title: Some("Opzione 1: Installazione automatica con WinGet (Gyan.FFmpeg)"),

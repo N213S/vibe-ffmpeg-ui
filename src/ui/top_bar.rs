@@ -1,6 +1,6 @@
 use crate::i18n::{Language, tr};
-use crate::models::media::{LocalFfmpegInfo, UpdateCheckState};
-use crate::net::ffmpeg_update::{OFFICIAL_BUILDS_PAGE, open_trusted_url};
+use crate::models::media::{APP_VERSION, AppUpdateState, LocalFfmpegInfo};
+use crate::net::ffmpeg_update::open_trusted_url;
 use crate::ui::theme::{ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, status_pill};
 use eframe::egui::{self, Button, Color32, CornerRadius, Label, RichText, Stroke};
 
@@ -17,12 +17,12 @@ pub struct TopBarActions {
     pub open_setup: bool,
 }
 
-/// Renders the header bar: binary status, official update checker, language switcher, and queue actions.
+/// Renders the header bar: binary status, official app update checker, language switcher, and queue actions.
 pub fn render_top_bar(
     ui: &mut egui::Ui,
     lang: Language,
     ffmpeg: &LocalFfmpegInfo,
-    update_state: &UpdateCheckState,
+    app_update_state: &AppUpdateState,
     is_running: bool,
     has_pending_work: bool,
     queue_len: usize,
@@ -39,7 +39,24 @@ pub fn render_top_bar(
                 .semantic_version
                 .as_deref()
                 .unwrap_or(t.ffmpeg_detected());
-            status_pill(ui, &format!("FFmpeg {ver}"), ACCENT_GREEN);
+            let ready_bg =
+                Color32::from_rgba_unmultiplied(ACCENT_GREEN.r(), ACCENT_GREEN.g(), ACCENT_GREEN.b(), 32);
+            let ready_btn = Button::new(
+                RichText::new(format!("FFmpeg {ver}"))
+                    .size(11.5)
+                    .strong()
+                    .color(ACCENT_GREEN),
+            )
+            .fill(ready_bg)
+            .stroke(Stroke::new(1.0, ACCENT_GREEN))
+            .corner_radius(CornerRadius::same(6));
+            if ui
+                .add(ready_btn)
+                .on_hover_text(t.setup_window_title())
+                .clicked()
+            {
+                actions.open_setup = true;
+            }
         } else {
             let missing_bg =
                 Color32::from_rgba_unmultiplied(ACCENT_RED.r(), ACCENT_RED.g(), ACCENT_RED.b(), 36);
@@ -63,7 +80,7 @@ pub fn render_top_bar(
 
         ui.separator();
 
-        let checking = matches!(update_state, UpdateCheckState::Checking);
+        let checking = matches!(app_update_state, AppUpdateState::Checking);
         if ui
             .add_enabled(
                 !checking,
@@ -74,52 +91,36 @@ pub fn render_top_bar(
             actions.check_updates = true;
         }
 
-        match update_state {
-            UpdateCheckState::Idle => {
+        match app_update_state {
+            AppUpdateState::Idle => {
                 ui.label(
-                    RichText::new(t.official_source())
+                    RichText::new(format!("v{APP_VERSION}  |  {}", t.official_source()))
                         .size(12.0)
                         .color(TEXT_MUTED),
                 );
             }
-            UpdateCheckState::Checking => {
+            AppUpdateState::Checking => {
                 ui.spinner();
             }
-            UpdateCheckState::Completed(info) => {
+            AppUpdateState::Completed(info) => {
                 if info.update_available {
                     status_pill(
                         ui,
-                        &format!("{} {}", t.update_available(), info.latest_release),
+                        &format!("{} v{}", t.update_available(), info.latest_version),
                         ACCENT_AMBER,
                     );
                     if ui.button(t.official_builds()).clicked() {
-                        let _ = open_trusted_url(OFFICIAL_BUILDS_PAGE);
-                    }
-                } else if info.local_version.is_none() {
-                    status_pill(
-                        ui,
-                        &format!("{} {}", t.latest_official_label(), info.latest_release),
-                        ACCENT_BLUE,
-                    );
-                    if ui.button(t.official_builds()).clicked() {
-                        let _ = open_trusted_url(OFFICIAL_BUILDS_PAGE);
+                        let _ = open_trusted_url(&info.release_url);
                     }
                 } else {
                     status_pill(
                         ui,
-                        &format!("{} ({})", t.up_to_date(), info.latest_release),
+                        &format!("{} (v{})", t.up_to_date(), info.current_version),
                         ACCENT_GREEN,
                     );
                 }
-                if let Some(ref git_ver) = info.latest_git {
-                    ui.label(
-                        RichText::new(format!("git: {git_ver}"))
-                            .size(11.0)
-                            .color(TEXT_MUTED),
-                    );
-                }
             }
-            UpdateCheckState::Error(err) => {
+            AppUpdateState::Error(err) => {
                 status_pill(ui, t.update_failed(), ACCENT_RED);
                 ui.add(Label::new(RichText::new(err).size(11.0).color(ACCENT_RED)).wrap());
             }

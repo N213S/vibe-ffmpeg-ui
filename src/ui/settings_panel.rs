@@ -30,6 +30,7 @@ pub fn render_settings_panel(
 
     ui.add_enabled_ui(!locked, |ui| {
         egui::ScrollArea::vertical()
+            .id_salt("settings_panel_scroll")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 render_mode_selector(ui, lang, settings, first_media);
@@ -67,6 +68,14 @@ pub fn render_settings_panel(
     });
 }
 
+/// Renders a settings card that consistently spans the full available panel width.
+fn settings_card(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {
+    card_frame().show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        add_contents(ui);
+    });
+}
+
 fn render_mode_selector(
     ui: &mut egui::Ui,
     lang: Language,
@@ -74,7 +83,7 @@ fn render_mode_selector(
     first_media: Option<&MediaInfo>,
 ) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.mode_section()).strong());
         ui.add_space(4.0);
         ui.horizontal_wrapped(|ui| {
@@ -106,11 +115,12 @@ fn render_preset_section(
     first_media: Option<&MediaInfo>,
 ) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.quick_presets()).strong());
         ui.add_space(4.0);
         egui::ComboBox::from_id_salt("preset_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(t.choose_preset_placeholder())
             .show_ui(ui, |ui| {
                 for preset in PresetProfile::ALL {
@@ -148,7 +158,7 @@ fn render_container_output_section(
     let t = tr(lang);
     let first_media = first_queued.and_then(|q| q.media.as_ref());
 
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.format_output_section()).strong());
         ui.add_space(4.0);
 
@@ -209,15 +219,15 @@ fn render_container_output_section(
                 .size(12.0)
                 .color(TEXT_MUTED),
         );
-        ui.horizontal_wrapped(|ui| {
-            ui.add(
+        ui.columns(2, |cols| {
+            cols[0].add(
                 TextEdit::singleline(&mut settings.output_prefix)
-                    .desired_width(120.0)
+                    .desired_width(f32::INFINITY)
                     .hint_text(t.prefix_hint()),
             );
-            ui.add(
+            cols[1].add(
                 TextEdit::singleline(&mut settings.output_suffix)
-                    .desired_width(120.0)
+                    .desired_width(f32::INFINITY)
                     .hint_text(t.suffix_hint()),
             );
         });
@@ -257,14 +267,16 @@ fn render_format_picker_popover(
         .corner_radius(CornerRadius::same(6))
         .inner_margin(Margin::same(8))
         .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+
             // Search box
             ui.horizontal(|ui| {
                 let clear_w = if settings.format_search_query.is_empty() {
                     0.0
                 } else {
-                    26.0
+                    32.0
                 };
-                let w = (ui.available_width() - clear_w).max(120.0);
+                let w = (ui.available_width() - clear_w).max(80.0);
                 ui.add(
                     TextEdit::singleline(&mut settings.format_search_query)
                         .desired_width(w)
@@ -311,14 +323,17 @@ fn render_format_picker_popover(
                     .collect()
             };
 
-            let col_w = ((ui.available_width() - 24.0) / 4.0).max(56.0);
             egui::ScrollArea::vertical()
-                .max_height(190.0)
+                .id_salt("format_picker_scroll")
+                .min_scrolled_height(190.0)
+                .max_height(220.0)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
+                    let grid_spacing = 6.0;
+                    let col_w = ((ui.available_width() - grid_spacing * 3.0 - 4.0) / 4.0).max(52.0);
                     egui::Grid::new("format_picker_grid")
                         .num_columns(4)
-                        .spacing(egui::vec2(6.0, 6.0))
+                        .spacing(egui::vec2(grid_spacing, grid_spacing))
                         .show(ui, |ui| {
                             for (idx, c) in candidates.iter().enumerate() {
                                 let target_mode = if settings.mode == ConvertMode::Remux
@@ -370,7 +385,7 @@ fn render_video_section(
     first_media: Option<&MediaInfo>,
 ) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.video_params_section()).strong());
         ui.add_space(4.0);
 
@@ -385,6 +400,7 @@ fn render_video_section(
         ui.label(RichText::new(t.video_codec()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("vcodec_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(video_codec_label(lang, settings.video_codec))
             .show_ui(ui, |ui| {
                 for vc in VideoCodec::ALL {
@@ -420,6 +436,7 @@ fn render_video_section(
         ui.label(RichText::new(t.encoder_speed()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("speed_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(encode_speed_label(lang, settings.speed))
             .show_ui(ui, |ui| {
                 for sp in EncodeSpeed::ALL {
@@ -457,6 +474,7 @@ fn render_video_section(
         ui.label(RichText::new(t.pixel_format()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("pixfmt_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(pixel_format_label(lang, settings.pixel_format))
             .show_ui(ui, |ui| {
                 for pf in PixelFormat::ALL {
@@ -472,6 +490,7 @@ fn render_video_section(
         ui.label(RichText::new(t.resolution()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("res_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(resolution_label(lang, settings.resolution))
             .show_ui(ui, |ui| {
                 for res in ResolutionOption::PRESETS {
@@ -503,6 +522,7 @@ fn render_video_section(
         ui.label(RichText::new(t.frame_rate()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("fps_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(fps_label(lang, settings.fps))
             .show_ui(ui, |ui| {
                 for f in FpsOption::ALL {
@@ -514,7 +534,7 @@ fn render_video_section(
 
 fn render_image_gif_section(ui: &mut egui::Ui, lang: Language, settings: &mut ConversionSettings) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.image_gif_section()).strong());
         ui.add_space(4.0);
 
@@ -581,7 +601,7 @@ fn render_image_gif_section(ui: &mut egui::Ui, lang: Language, settings: &mut Co
 
 fn render_subtitle_section(ui: &mut egui::Ui, lang: Language) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.subtitle_section()).strong());
         ui.add_space(4.0);
         ui.add(
@@ -597,7 +617,7 @@ fn render_subtitle_section(ui: &mut egui::Ui, lang: Language) {
 
 fn render_remux_section(ui: &mut egui::Ui, lang: Language) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.remux_section()).strong());
         ui.add_space(4.0);
         ui.add(
@@ -618,7 +638,7 @@ fn render_audio_section(
     ffmpeg: &LocalFfmpegInfo,
 ) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.audio_params_section()).strong());
         ui.add_space(4.0);
 
@@ -638,6 +658,7 @@ fn render_audio_section(
         let prev = settings.audio_codec;
         egui::ComboBox::from_id_salt("acodec_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(audio_codec_label(lang, settings.audio_codec))
             .show_ui(ui, |ui| {
                 for ac in AudioCodec::ALL {
@@ -676,6 +697,7 @@ fn render_audio_section(
         ui.label(RichText::new(t.sample_rate()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("sr_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(audio_sample_rate_label(lang, settings.audio_sample_rate))
             .show_ui(ui, |ui| {
                 for sr in AudioSampleRate::ALL {
@@ -696,6 +718,7 @@ fn render_audio_section(
         ui.label(RichText::new(t.channels()).size(12.0).color(TEXT_MUTED));
         egui::ComboBox::from_id_salt("ch_combo")
             .width(ui.available_width())
+            .truncate()
             .selected_text(audio_channels_label(lang, settings.audio_channels))
             .show_ui(ui, |ui| {
                 for ch in AudioChannels::ALL {
@@ -711,7 +734,7 @@ fn render_audio_section(
 
 fn render_safety_section(ui: &mut egui::Ui, lang: Language, settings: &mut ConversionSettings) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.safety_section()).strong());
         ui.add_space(4.0);
 
@@ -743,7 +766,7 @@ fn render_command_preview(
     first_queued: Option<&QueuedFile>,
 ) {
     let t = tr(lang);
-    card_frame().show(ui, |ui| {
+    settings_card(ui, |ui| {
         ui.label(RichText::new(t.command_preview_section()).strong());
         ui.add_space(4.0);
 

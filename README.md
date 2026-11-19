@@ -18,13 +18,15 @@ Lightweight, native multi-mode desktop GUI for FFmpeg written in Rust (`eframe` 
 No installer is needed — just `ffmpeg-ui.exe` plus `ffmpeg.exe` and `ffprobe.exe`:
 
 1. **Download Vibe FFmpeg**: Grab `ffmpeg-ui.exe` from the [GitHub Releases](https://github.com/N213S/vibe-ffmpeg-ui/releases) page (or compile from source below).
-2. **Install FFmpeg + ffprobe** *(both binaries are required)* using either option:
-   - **Option A — Portable (Zero `PATH` setup, easiest)**:
-     1. Download an official FFmpeg Windows build from [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/) (recommended: `ffmpeg-release-full.7z`).
-     2. Extract and copy **`ffmpeg.exe`** and **`ffprobe.exe`** (from the `bin\` folder) into the **same folder** next to `ffmpeg-ui.exe`. Vibe FFmpeg checks sibling executables first.
-   - **Option B — System `PATH` (via `winget` or Manual Setup)**:
-     - **Via `winget`**: Run `winget install Gyan.FFmpeg` in PowerShell/Terminal, then **close and reopen** Vibe FFmpeg so it picks up the updated `PATH`.
-     - **Manual `PATH`**: Extract FFmpeg to a folder (e.g. `C:\ffmpeg`), open **Start** -> search **"Edit the system environment variables"** -> **Environment Variables** -> edit **Path** -> add `C:\ffmpeg\bin` -> click **OK**, then relaunch Vibe FFmpeg.
+2. **Install FFmpeg + ffprobe** *(both binaries are required)* using any of these options:
+   - **Option A — Built-in Auto-Install via WinGet (Easiest)**:
+     - If `ffmpeg.exe` or `ffprobe.exe` is missing at launch, Vibe FFmpeg opens the **FFmpeg Setup** window automatically (you can also reopen it anytime by clicking the `FFmpeg` status pill in the top toolbar).
+     - Click **Auto-Install FFmpeg (WinGet)** to install `Gyan.FFmpeg` silently (`winget install --id Gyan.FFmpeg --exact`). Vibe FFmpeg scans WinGet links/packages and fresh Registry `PATH` automatically, so no app restart is required.
+   - **Option B — Portable (`gyan.dev`, Zero `PATH` setup)**:
+     1. Use **Check Official Version** / **Open Official Builds (`gyan.dev`)** in the **FFmpeg Setup** window (or visit [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/)) and download `ffmpeg-release-full.7z`.
+     2. Extract **`ffmpeg.exe`** and **`ffprobe.exe`** (from `bin\`) into the **same folder** next to `ffmpeg-ui.exe` (Vibe FFmpeg checks sibling executables first), then click **Re-scan FFmpeg**.
+   - **Option C — Manual System `PATH`**:
+     - Extract FFmpeg to a folder (e.g. `C:\ffmpeg`), open **Start** -> **"Edit the system environment variables"** -> **Environment Variables** -> edit **Path** -> add `C:\ffmpeg\bin` -> click **OK**, then click **Re-scan FFmpeg** (or relaunch).
 3. **Bypass Windows SmartScreen (Unsigned Executable Notice)**:
    - Because `ffmpeg-ui.exe` is an unsigned indie open-source binary without a paid EV code-signing certificate, Windows SmartScreen (*"Windows protected your PC"*) or antivirus heuristics may flag it on first launch.
    - Make sure you downloaded it from [`N213S/vibe-ffmpeg-ui/releases`](https://github.com/N213S/vibe-ffmpeg-ui/releases), then click **More info** -> **Run anyway** (or inspect the Rust source and build locally with `cargo build --release`).
@@ -32,7 +34,10 @@ No installer is needed — just `ffmpeg-ui.exe` plus `ffmpeg.exe` and `ffprobe.e
 ## Privacy & Offline Guarantee
 
 - **100% Local Processing**: Media probing (`ffprobe`), conversion (`ffmpeg`), atomic temporary staging, and output verification run completely offline on your machine. **No media files, filenames, usage analytics, or telemetry are ever uploaded to any cloud server.** The only file saved locally is your UI language preference (`%APPDATA%\vibe-ffmpeg\preferences.json`).
-- **Minimal Network Usage (Manual Update Check Only)**: The app never phones home on startup. Outbound HTTPS connections occur **only** when you click **Check Update** in the top toolbar, querying strict allowlisted `https://www.gyan.dev/ffmpeg/builds/release-version` and `git-version` endpoints (read limit capped at 2 KB, 8-second timeout via Windows `native-tls`).
+- **Minimal Network Usage (Manual Update Checks Only)**: The app never phones home on startup. Outbound HTTPS connections (8-second timeout via Windows `native-tls`) occur **only** when explicitly clicked:
+  - **Check Update** (top toolbar): Queries strict allowlisted GitHub Releases (`https://api.github.com/repos/N213S/vibe-ffmpeg-ui/releases?per_page=5`, 32 KB read cap) to check for newer Vibe FFmpeg releases.
+  - **Check Official Version** (inside **FFmpeg Setup**): Queries strict allowlisted `https://www.gyan.dev/ffmpeg/builds/release-version` and `git-version` endpoints (2 KB read cap) for official FFmpeg builds.
+  - **Auto-Install FFmpeg (WinGet)**: Runs `winget.exe` (`Gyan.FFmpeg`) only when clicked by the user.
 
 ## Features & Architecture
 
@@ -53,6 +58,9 @@ No installer is needed — just `ffmpeg-ui.exe` plus `ffmpeg.exe` and `ffprobe.e
   - Stages output to `.<stem>.<pid>_<job_id>.tmp.<ext>` with explicit `-f <muxer>` flags, verifies streams/duration/subtitles via `ffprobe` + deep decode check (`ffmpeg -v error -xerror -f null -`, `RIFF`/`WEBP` header check for animated WebP, or `ffprobe` header check for Subtitle mode) according to `ConvertMode`, and atomically commits only on success.
 - **Resizable & Pop-out Native OS Diagnostic Logs (`src/ui/log_panel.rs`)**:
   - Drag the top edge of the expanded bottom log drawer to resize vertically, or click **Pop Out Window** to open a real, independent OS window (`egui` multi-viewport via `show_viewport_immediate`, with `EmbeddedWindow` fallback) that can be dragged outside the main window or across monitors, with **Copy All** and **Clear Log** actions.
+- **Built-in FFmpeg Setup & Separate Update Checks (`src/ui/ffmpeg_setup_window.rs`, `src/net/`)**:
+  - Clicking the top-bar `FFmpeg` status pill (or launching without FFmpeg) opens an independent **FFmpeg Setup** OS window with one-click `Gyan.FFmpeg` WinGet auto-install, `gyan.dev` version checks, official download links, and live binary re-scanning (sibling folder -> `PATH` -> WinGet Links/Packages -> Windows Registry `HKCU`/`HKLM` `Path`).
+  - Top-bar **Check Update** checks GitHub Releases for newer Vibe FFmpeg versions (`v0.2.2+`) and links directly to the release page for manual download.
 - **14 Persistent UI Languages (`src/i18n/`)**:
   - Supports `EN`, `TH`, `JA`, `ZH-CN`, `ZH-TW`, `KO`, `VI`, `ID`, `ES`, `PT-BR`, `FR`, `DE`, `IT`, and `RU` in an independent searchable OS window, persisted across restarts in `%APPDATA%\vibe-ffmpeg\preferences.json` (all translations generated by AI).
 
@@ -83,11 +91,11 @@ When a job shows a red **Failed** badge, the temporary staging file (`.tmp.<ext>
 - `src/main.rs` — Window bootstrap and Windows GUI subsystem entry point.
 - `src/app.rs` — App state, worker event dispatch, automatic compatible-mode selection on probe, `rfd` multi-format file dialogs, and drag-and-drop handling.
 - `src/models/` — `ConvertMode`, `ContainerFormat`, `ConversionSettings`, `PresetProfile`, `IncompatibilityReason`, `check_mode_compatibility`, `MediaInfo`, `QueuedFile`.
-- `src/security/path_guard.rs` — Path canonicalization, media extension registries (`VIDEO_EXTENSIONS`, `AUDIO_EXTENSIONS`, `IMAGE_EXTENSIONS`, `SUBTITLE_EXTENSIONS`), `%APPDATA%\vibe-ffmpeg\preferences.json` persistence, filename sanitization, prefix/suffix composition, collision protection, and `.tmp.<ext>` staging.
-- `src/ffmpeg/` — `discovery.rs`, `probe.rs`, `command_builder.rs`, `validator.rs`, `runner.rs`.
-- `src/net/ffmpeg_update.rs` — HTTPS official FFmpeg update check.
+- `src/security/path_guard.rs` — Path canonicalization, media extension registries (`VIDEO_EXTENSIONS`, `AUDIO_EXTENSIONS`, `IMAGE_EXTENSIONS`, `SUBTITLE_EXTENSIONS`), `TRUSTED_HTTPS_PREFIXES` allowlist, `%APPDATA%\vibe-ffmpeg\preferences.json` persistence, filename sanitization, prefix/suffix composition, collision protection, and `.tmp.<ext>` staging.
+- `src/ffmpeg/` — `discovery.rs` (sibling/`PATH`/WinGet/Registry discovery), `installer.rs` (non-interactive WinGet `Gyan.FFmpeg` runner), `probe.rs`, `command_builder.rs`, `validator.rs`, `runner.rs`.
+- `src/net/` — `app_update.rs` (GitHub Releases app update check) and `ffmpeg_update.rs` (HTTPS official `gyan.dev` FFmpeg check).
 - `src/i18n/` — 14-language localization tables with English fallback.
-- `src/ui/` — `theme.rs`, `top_bar.rs`, `queue_panel.rs`, `settings_panel.rs` (presets & searchable `FROM -> TO` picker), `log_panel.rs` (docked drawer & native OS window), `language_window.rs` (searchable native OS window).
+- `src/ui/` — `theme.rs`, `top_bar.rs`, `queue_panel.rs`, `settings_panel.rs` (presets & searchable `FROM -> TO` picker), `log_panel.rs` (docked drawer & native OS window), `language_window.rs` (searchable native OS window), `ffmpeg_setup_window.rs` (WinGet auto-install & official FFmpeg download OS window).
 
 ## Build & Test
 

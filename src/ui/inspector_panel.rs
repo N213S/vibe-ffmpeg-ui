@@ -2,9 +2,9 @@ use crate::i18n::{Language, tr};
 use crate::models::media::{MediaInfo, QueuedFile, StreamDetail, format_bytes, format_duration};
 use crate::ui::theme::{
     ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, BG_MAIN, BORDER_SUBTLE, TEXT_MUTED,
-    card_frame, status_pill,
+    card_frame, standard_button_height, status_pill, uniform_button, uniform_button_width,
 };
-use eframe::egui::{self, Button, CornerRadius, Frame, Label, Margin, RichText, Stroke};
+use eframe::egui::{self, CornerRadius, Frame, Label, Margin, RichText, Stroke};
 
 /// Renders the read-only `ffprobe` container, stream, metadata tag, and raw JSON inspector panel.
 pub fn render_inspector_panel(
@@ -47,12 +47,19 @@ pub fn render_inspector_panel(
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new(t.inspector_title()).strong().color(ACCENT_BLUE));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let btn_w = uniform_button_width(
+                            ui,
+                            &[t.reprobe_btn(), t.inspector_copy_report()],
+                            88.0,
+                        );
+                        let btn_h = standard_button_height(ui);
                         if let Some(ref media) = item.media
-                            && ui.small_button(t.inspector_copy_report()).clicked()
+                            && uniform_button(ui, t.inspector_copy_report(), btn_w, btn_h, None)
+                                .clicked()
                         {
                             ui.ctx().copy_text(media.formatted_report(&item.input_path));
                         }
-                        if ui.small_button(t.reprobe_btn()).clicked() {
+                        if uniform_button(ui, t.reprobe_btn(), btn_w, btn_h, None).clicked() {
                             reprobe_clicked = true;
                         }
                     });
@@ -324,13 +331,19 @@ fn render_raw_json_card(
     inspector_card(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
             let arrow = if *raw_json_open { "▼" } else { "▶" };
-            if ui
-                .add(Button::new(format!("{arrow} {}", t.inspector_raw_json())).small())
-                .clicked()
-            {
+            let toggle_label = format!("{arrow} {}", t.inspector_raw_json());
+            let btn_w = uniform_button_width(
+                ui,
+                &[toggle_label.as_str(), t.inspector_copy_json()],
+                100.0,
+            );
+            let btn_h = standard_button_height(ui);
+            if uniform_button(ui, &toggle_label, btn_w, btn_h, None).clicked() {
                 *raw_json_open = !*raw_json_open;
             }
-            if !media.raw_json.is_empty() && ui.small_button(t.inspector_copy_json()).clicked() {
+            if !media.raw_json.is_empty()
+                && uniform_button(ui, t.inspector_copy_json(), btn_w, btn_h, None).clicked()
+            {
                 ui.ctx().copy_text(media.raw_json.clone());
             }
         });

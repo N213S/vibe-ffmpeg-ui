@@ -1,5 +1,8 @@
 use crate::i18n::{Language, tr};
-use crate::ui::theme::{ACCENT_BLUE, BG_PANEL, TEXT_MUTED};
+use crate::ui::theme::{
+    ACCENT_BLUE, BG_PANEL, TEXT_MUTED, standard_button_height, uniform_button,
+    uniform_button_width,
+};
 use eframe::egui::{
     self, Button, CentralPanel, Frame, Label, Margin, RichText, ViewportBuilder, ViewportClass,
     ViewportId,
@@ -26,24 +29,28 @@ pub fn render_log_panel(
             *expanded = !*expanded;
         }
 
-        let pop_btn = Button::new(t.pop_out_window())
-            .small()
-            .fill(if *window_open {
-                ACCENT_BLUE
-            } else {
-                egui::Color32::from_rgb(35, 42, 58)
-            });
-        if ui.add(pop_btn).clicked() {
+        let btn_w = uniform_button_width(
+            ui,
+            &[t.pop_out_window(), t.copy_log(), t.clear_log()],
+            92.0,
+        );
+        let btn_h = standard_button_height(ui);
+        let pop_fill = if *window_open {
+            ACCENT_BLUE
+        } else {
+            egui::Color32::from_rgb(35, 42, 58)
+        };
+        if uniform_button(ui, t.pop_out_window(), btn_w, btn_h, Some(pop_fill)).clicked() {
             *window_open = !*window_open;
             if *window_open {
                 *expanded = false;
             }
         }
 
-        if !logs.is_empty() && ui.small_button(t.copy_log()).clicked() {
+        if !logs.is_empty() && uniform_button(ui, t.copy_log(), btn_w, btn_h, None).clicked() {
             copy_logs_to_clipboard(ui.ctx(), logs);
         }
-        if !logs.is_empty() && ui.small_button(t.clear_log()).clicked() {
+        if !logs.is_empty() && uniform_button(ui, t.clear_log(), btn_w, btn_h, None).clicked() {
             *on_clear = true;
         }
     });
@@ -121,21 +128,23 @@ fn render_log_window_contents(
 ) {
     let t = tr(lang);
     ui.horizontal_wrapped(|ui| {
+        let btn_w = uniform_button_width(ui, &[t.copy_log(), t.clear_log(), t.close_btn()], 84.0);
+        let btn_h = standard_button_height(ui);
         if ui
-            .add_enabled(!logs.is_empty(), Button::new(t.copy_log()).small())
+            .add_enabled(!logs.is_empty(), Button::new(t.copy_log()).min_size(egui::vec2(btn_w, btn_h)))
             .clicked()
         {
             copy_logs_to_clipboard(ui.ctx(), logs);
         }
         if ui
-            .add_enabled(!logs.is_empty(), Button::new(t.clear_log()).small())
+            .add_enabled(!logs.is_empty(), Button::new(t.clear_log()).min_size(egui::vec2(btn_w, btn_h)))
             .clicked()
         {
             *on_clear = true;
             ui.ctx().request_repaint_of(ViewportId::ROOT);
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.small_button(t.close_btn()).clicked() {
+            if uniform_button(ui, t.close_btn(), btn_w, btn_h, None).clicked() {
                 *open = false;
                 ui.ctx().request_repaint_of(ViewportId::ROOT);
             }

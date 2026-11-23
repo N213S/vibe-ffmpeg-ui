@@ -3,7 +3,8 @@ use crate::models::config::ConversionSettings;
 use crate::models::media::{AppWorkspaceMode, FileStatus, QueuedFile, format_bytes, format_duration};
 use crate::security::path_guard::compose_output_filename;
 use crate::ui::theme::{
-    ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, card_frame, status_pill,
+    ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, card_frame,
+    standard_button_height, status_pill, uniform_button, uniform_button_width,
 };
 use eframe::egui::{self, Label, ProgressBar, RichText, Stroke, TextEdit};
 use std::path::Path;
@@ -138,10 +139,14 @@ fn render_file_card(
                             | FileStatus::Failed(_)
                             | FileStatus::Cancelled
                     );
-                if removable && ui.small_button(t.remove_btn()).clicked() {
+                let btn_w = uniform_button_width(ui, &[t.inspect_btn(), t.remove_btn()], 72.0);
+                let btn_h = standard_button_height(ui);
+                if removable
+                    && uniform_button(ui, t.remove_btn(), btn_w, btn_h, None).clicked()
+                {
                     actions.remove_file_id = Some(item.id);
                 }
-                if ui.small_button(t.inspect_btn()).clicked() {
+                if uniform_button(ui, t.inspect_btn(), btn_w, btn_h, None).clicked() {
                     actions.inspect_file_id = Some(item.id);
                 }
                 render_status_badge(ui, lang, &item.status);

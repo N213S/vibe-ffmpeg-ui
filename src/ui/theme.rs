@@ -132,6 +132,44 @@ pub fn card_frame() -> Frame {
         .inner_margin(Margin::same(12))
 }
 
+/// Computes a uniform width across a group of button labels so sibling buttons match in size.
+pub fn uniform_button_width(ui: &egui::Ui, labels: &[&str], min_width: f32) -> f32 {
+    let font_id = egui::TextStyle::Button.resolve(ui.style());
+    let pad_x = ui.spacing().button_padding.x * 2.0 + 4.0;
+    let max_text_w = labels
+        .iter()
+        .map(|text| {
+            ui.fonts_mut(|f| {
+                f.layout_no_wrap((*text).to_string(), font_id.clone(), Color32::WHITE)
+                    .size()
+                    .x
+            })
+        })
+        .fold(0.0_f32, f32::max);
+    (max_text_w + pad_x).max(min_width)
+}
+
+/// Standard height for regular toolbar/card action buttons using current button padding.
+pub fn standard_button_height(ui: &egui::Ui) -> f32 {
+    let text_h = ui.text_style_height(&egui::TextStyle::Button);
+    (text_h + ui.spacing().button_padding.y * 2.0).max(ui.spacing().interact_size.y)
+}
+
+/// Renders a button with an explicit uniform size and optional custom fill color.
+pub fn uniform_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    width: f32,
+    height: f32,
+    fill: Option<Color32>,
+) -> egui::Response {
+    let mut btn = egui::Button::new(label).min_size(egui::vec2(width, height));
+    if let Some(bg) = fill {
+        btn = btn.fill(bg);
+    }
+    ui.add(btn)
+}
+
 /// Renders a compact colored status badge pill.
 pub fn status_pill(ui: &mut egui::Ui, text: &str, color: Color32) {
     let bg = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 32);

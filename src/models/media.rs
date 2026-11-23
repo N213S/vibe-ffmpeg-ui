@@ -1,4 +1,3 @@
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 /// Top-level workspace mode: batch conversion (`FFmpeg`) or read-only file inspection (`ffprobe`).
@@ -107,86 +106,11 @@ impl MediaInfo {
 
     /// Generates a readable multi-line ffprobe inspection report for copying or troubleshooting.
     pub fn formatted_report(&self, file_path: &Path) -> String {
-        let mut out = String::new();
-        let _ = writeln!(out, "File: {}", file_path.display());
-        match &self.format_long_name {
-            Some(long) if !long.is_empty() => {
-                let _ = writeln!(out, "Container: {} ({long})", self.format_name);
-            }
-            _ => {
-                let _ = writeln!(out, "Container: {}", self.format_name);
-            }
-        }
-        let _ = writeln!(
-            out,
-            "Size: {} ({} B)",
-            format_bytes(self.file_size_bytes),
-            self.file_size_bytes
-        );
-        if let Some(dur) = self.duration_secs {
-            let _ = writeln!(out, "Duration: {} ({dur:.3} s)", format_duration(dur));
-        }
-        if let Some(br) = self.bit_rate {
-            let _ = writeln!(out, "Overall Bitrate: {} kbps ({br} bps)", br / 1000);
-        }
-        if let Some(score) = self.probe_score {
-            let _ = writeln!(out, "Probe Score: {score}/100");
-        }
-
-        if !self.format_tags.is_empty() {
-            let _ = writeln!(out, "\nContainer Tags:");
-            for (k, v) in &self.format_tags {
-                let _ = writeln!(out, "  {k}: {v}");
-            }
-        }
-
-        let _ = writeln!(out, "\nStreams ({}):", self.streams.len());
-        for s in &self.streams {
-            let _ = writeln!(
-                out,
-                "  #{} [{}] {}{}",
-                s.index,
-                s.codec_type,
-                s.codec_name,
-                s.profile
-                    .as_deref()
-                    .map(|p| format!(" ({p})"))
-                    .unwrap_or_default()
-            );
-            if let (Some(w), Some(h)) = (s.width, s.height) {
-                let fps_s = s.fps.map(|f| format!(" @ {f:.3} fps")).unwrap_or_default();
-                let pix = s
-                    .pixel_format
-                    .as_deref()
-                    .map(|p| format!(" [{p}]"))
-                    .unwrap_or_default();
-                let _ = writeln!(out, "    Video: {w}x{h}{pix}{fps_s}");
-            }
-            if let Some(sr) = s.sample_rate {
-                let ch = s.channels.map(|c| format!(" {c}ch")).unwrap_or_default();
-                let layout = s
-                    .channel_layout
-                    .as_deref()
-                    .map(|l| format!(" ({l})"))
-                    .unwrap_or_default();
-                let _ = writeln!(out, "    Audio: {sr} Hz{ch}{layout}");
-            }
-            if let Some(br) = s.bit_rate {
-                let _ = writeln!(out, "    Bitrate: {} kbps", br / 1000);
-            }
-            if let Some(ref lang) = s.language {
-                let _ = writeln!(out, "    Language: {lang}");
-            }
-            if let Some(ref title) = s.title {
-                let _ = writeln!(out, "    Title: {title}");
-            }
-            for (k, v) in &s.tags {
-                if k != "language" && k != "title" {
-                    let _ = writeln!(out, "    Tag {k}: {v}");
-                }
-            }
-        }
-        out
+        crate::ffmpeg::report_export::render_report(
+            self,
+            file_path,
+            crate::ffmpeg::report_export::ReportExportFormat::Text,
+        )
     }
 }
 

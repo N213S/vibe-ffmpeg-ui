@@ -255,4 +255,5 @@ pub const RAW: RawTranslations = RawTranslations {
     inspector_format_label: Some("フォーマット / デマルチプレクサ"),
     inspector_duration_label: Some("長さ"),
     inspector_bitrate_label: Some("全体ビットレート"),
+    inspector_export: Some("エクスポート"),
 };

@@ -444,6 +444,7 @@ define_translations!(
     inspector_format_label,
     inspector_duration_label,
     inspector_bitrate_label,
+    inspector_export,
 );
 
 const fn raw_table(lang: Language) -> &'static RawTranslations {

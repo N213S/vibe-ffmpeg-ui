@@ -1,3 +1,4 @@
+use crate::ffmpeg::report_export::ReportExportFormat;
 use crate::i18n::{Language, tr};
 use crate::models::media::{MediaInfo, QueuedFile, StreamDetail, format_bytes, format_duration};
 use crate::ui::theme::{
@@ -6,14 +7,21 @@ use crate::ui::theme::{
 };
 use eframe::egui::{self, CornerRadius, Frame, Label, Margin, RichText, Stroke};
 
+#[derive(Debug, Default)]
+pub struct InspectorActions {
+    pub reprobe: bool,
+    pub export_format: Option<ReportExportFormat>,
+}
+
 /// Renders the read-only `ffprobe` container, stream, metadata tag, and raw JSON inspector panel.
 pub fn render_inspector_panel(
     ui: &mut egui::Ui,
     lang: Language,
     selected_file: Option<&QueuedFile>,
     raw_json_open: &mut bool,
-) -> bool {
-    let mut reprobe_clicked = false;
+    export_menu_open: &mut bool,
+) -> InspectorActions {
+    let mut actions = InspectorActions::default();
     let t = tr(lang);
 
     egui::ScrollArea::vertical()
@@ -44,26 +52,108 @@ pub fn render_inspector_panel(
 
             // File Header Card
             inspector_card(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new(t.inspector_title()).strong().color(ACCENT_BLUE));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let btn_w = uniform_button_width(
-                            ui,
-                            &[t.reprobe_btn(), t.inspector_copy_report()],
-                            88.0,
-                        );
-                        let btn_h = standard_button_height(ui);
+                let export_label = format!(
+                    "{} {}",
+                    t.inspector_export(),
+                    if *export_menu_open { "▲" } else { "▾" }
+                );
+                let btn_w = uniform_button_width(
+                    ui,
+                    &[
+                        t.reprobe_btn(),
+                        t.inspector_copy_report(),
+                        export_label.as_str(),
+                    ],
+                    84.0,
+                );
+                let btn_h = standard_button_height(ui);
+                let btn_count: usize = if item.media.is_some() { 3 } else { 1 };
+                let spacing_x = ui.spacing().item_spacing.x;
+                let buttons_total_w =
+                    btn_w * (btn_count as f32) + spacing_x * (btn_count.saturating_sub(1) as f32);
+                let title_font = egui::TextStyle::Body.resolve(ui.style());
+                let title_w = ui.fonts_mut(|f| {
+                    f.layout_no_wrap(t.inspector_title().to_string(), title_font, ACCENT_BLUE)
+                        .size()
+                        .x
+                });
+                let fits_inline = title_w + spacing_x * 2.0 + buttons_total_w <= ui.available_width();
+
+                if fits_inline {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(t.inspector_title()).strong().color(ACCENT_BLUE));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if item.media.is_some() {
+                                let export_fill = (*export_menu_open).then_some(ACCENT_BLUE);
+                                if uniform_button(ui, &export_label, btn_w, btn_h, export_fill)
+                                    .clicked()
+                                {
+                                    *export_menu_open = !*export_menu_open;
+                                }
+                            }
+                            if let Some(ref media) = item.media
+                                && uniform_button(ui, t.inspector_copy_report(), btn_w, btn_h, None)
+                                    .clicked()
+                            {
+                                ui.ctx().copy_text(media.formatted_report(&item.input_path));
+                            }
+                            if uniform_button(ui, t.reprobe_btn(), btn_w, btn_h, None).clicked() {
+                                actions.reprobe = true;
+                            }
+                        });
+                    });
+                } else {
+                    ui.add(
+                        Label::new(RichText::new(t.inspector_title()).strong().color(ACCENT_BLUE))
+                            .wrap(),
+                    );
+                    ui.add_space(6.0);
+                    ui.horizontal_wrapped(|ui| {
+                        if uniform_button(ui, t.reprobe_btn(), btn_w, btn_h, None).clicked() {
+                            actions.reprobe = true;
+                        }
                         if let Some(ref media) = item.media
                             && uniform_button(ui, t.inspector_copy_report(), btn_w, btn_h, None)
                                 .clicked()
                         {
                             ui.ctx().copy_text(media.formatted_report(&item.input_path));
                         }
-                        if uniform_button(ui, t.reprobe_btn(), btn_w, btn_h, None).clicked() {
-                            reprobe_clicked = true;
+                        if item.media.is_some() {
+                            let export_fill = (*export_menu_open).then_some(ACCENT_BLUE);
+                            if uniform_button(ui, &export_label, btn_w, btn_h, export_fill)
+                                .clicked()
+                            {
+                                *export_menu_open = !*export_menu_open;
+                            }
                         }
                     });
-                });
+                }
+                if *export_menu_open && item.media.is_some() {
+                    ui.add_space(6.0);
+                    Frame::new()
+                        .fill(BG_MAIN)
+                        .stroke(Stroke::new(1.0, BORDER_SUBTLE))
+                        .corner_radius(CornerRadius::same(6))
+                        .inner_margin(Margin::same(8))
+                        .show(ui, |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                let labels: Vec<&str> = ReportExportFormat::ALL
+                                    .iter()
+                                    .map(|f| f.short_label())
+                                    .collect();
+                                let fmt_w = uniform_button_width(ui, &labels, 68.0);
+                                let fmt_h = standard_button_height(ui);
+                                for fmt in ReportExportFormat::ALL {
+                                    if uniform_button(ui, fmt.short_label(), fmt_w, fmt_h, None)
+                                        .clicked()
+                                    {
+                                        actions.export_format = Some(*fmt);
+                                        *export_menu_open = false;
+                                    }
+                                }
+                            });
+                        });
+                }
                 ui.add_space(4.0);
                 ui.add(Label::new(RichText::new(file_name).size(14.5).strong()).wrap());
                 ui.add(
@@ -113,7 +203,7 @@ pub fn render_inspector_panel(
             render_raw_json_card(ui, lang, media, raw_json_open);
         });
 
-    reprobe_clicked
+    actions
 }
 
 fn inspector_card(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {

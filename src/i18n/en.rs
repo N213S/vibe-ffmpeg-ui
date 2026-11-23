@@ -255,4 +255,5 @@ pub const RAW: RawTranslations = RawTranslations {
     inspector_format_label: Some("Format / Demuxer"),
     inspector_duration_label: Some("Duration"),
     inspector_bitrate_label: Some("Overall Bitrate"),
+    inspector_export: Some("Export"),
 };

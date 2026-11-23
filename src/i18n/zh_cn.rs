@@ -255,4 +255,5 @@ pub const RAW: RawTranslations = RawTranslations {
     inspector_format_label: Some("格式 / 解复用器"),
     inspector_duration_label: Some("时长"),
     inspector_bitrate_label: Some("总码率"),
+    inspector_export: Some("导出"),
 };

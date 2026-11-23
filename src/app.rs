@@ -1,6 +1,7 @@
 use crate::ffmpeg::discovery::discover_local_ffmpeg;
 use crate::ffmpeg::installer::{find_winget_exe, spawn_ffmpeg_rescan, spawn_winget_install};
 use crate::ffmpeg::probe::probe_media;
+use crate::ffmpeg::report_export::export_report_to_file;
 use crate::ffmpeg::runner::{BatchJobItem, spawn_batch_conversion};
 use crate::i18n::{Language, tr};
 use crate::models::config::{ConversionSettings, ConvertMode, check_mode_compatibility};
@@ -53,6 +54,7 @@ pub struct FfmpegStudioApp {
     workspace_mode: AppWorkspaceMode,
     selected_file_id: Option<u64>,
     inspector_raw_json_open: bool,
+    inspector_export_menu_open: bool,
     queue: Vec<QueuedFile>,
     next_file_id: u64,
     is_running: bool,
@@ -108,6 +110,7 @@ impl FfmpegStudioApp {
             workspace_mode: AppWorkspaceMode::Convert,
             selected_file_id: None,
             inspector_raw_json_open: false,
+            inspector_export_menu_open: false,
             queue: Vec::new(),
             next_file_id: 1,
             is_running: false,
@@ -624,7 +627,7 @@ impl eframe::App for FfmpegStudioApp {
                     .and_then(|id| self.queue.iter().find(|q| q.id == id))
                     .or_else(|| self.queue.first())
                     .cloned();
-                let mut reprobe_selected = false;
+                let mut inspector_actions = crate::ui::inspector_panel::InspectorActions::default();
                 Panel::right("right_inspector")
                     .resizable(true)
                     .default_size(480.0)
@@ -632,17 +635,32 @@ impl eframe::App for FfmpegStudioApp {
                     .max_size(680.0)
                     .frame(panel_frame)
                     .show(ui, |ui| {
-                        reprobe_selected = render_inspector_panel(
+                        inspector_actions = render_inspector_panel(
                             ui,
                             self.language,
                             selected_item.as_ref(),
                             &mut self.inspector_raw_json_open,
+                            &mut self.inspector_export_menu_open,
                         );
                     });
-                if reprobe_selected
-                    && let Some(item) = selected_item
+                if inspector_actions.reprobe
+                    && let Some(ref item) = selected_item
                 {
                     self.reprobe_single(item.id, ui.ctx());
+                }
+                if let Some(fmt) = inspector_actions.export_format
+                    && let Some(ref item) = selected_item
+                    && let Some(ref media) = item.media
+                {
+                    match export_report_to_file(media, &item.input_path, fmt) {
+                        Ok(Some(saved)) => {
+                            self.push_log(format!("[Export] Saved {}", saved.display()));
+                        }
+                        Ok(None) => {}
+                        Err(err) => {
+                            self.push_log(format!("[Export Error] {err}"));
+                        }
+                    }
                 }
             }
         }

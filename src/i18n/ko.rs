@@ -255,4 +255,5 @@ pub const RAW: RawTranslations = RawTranslations {
     inspector_format_label: Some("포맷 / 디먹서"),
     inspector_duration_label: Some("길이"),
     inspector_bitrate_label: Some("전체 비트레이트"),
+    inspector_export: Some("내보내기"),
 };

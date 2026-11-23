@@ -255,4 +255,5 @@ pub const RAW: RawTranslations = RawTranslations {
     inspector_format_label: Some("ฟอร์แมต / ตัวแยกสตรีม"),
     inspector_duration_label: Some("ความยาว"),
     inspector_bitrate_label: Some("บิตเรตรวม"),
+    inspector_export: Some("ส่งออก"),
 };

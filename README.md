@@ -1,101 +1,166 @@
 # Vibe FFmpeg ⚡
 
-> **Built with AI Vibe Coding 🤖✨** — This project was created and iterated through AI-assisted vibe coding (prompt-driven engineering in Rust).
->
-> Built purely to scratch my own itch and fit my personal workflow—open-sourced in case others find it useful too!
+> **Built with AI Vibe Coding 🤖✨** — Created and iterated through prompt-driven engineering in Rust to scratch a personal itch and fit a fast daily workflow—open-sourced in case you find it useful too.
 
-Lightweight, native multi-mode desktop GUI for FFmpeg written in Rust (`eframe` / `egui` 0.37 + `rfd` 0.18), engineered for speed, complete parameter generation, custom output naming, and mode-aware integrity verification.
+**Vibe FFmpeg** is a lightweight, native desktop GUI for **FFmpeg** and **ffprobe** built in Rust (`eframe` / `egui` 0.37 + `rfd` 0.18). It focuses on fast batch conversions, read-only deep media inspection, custom output naming, and mode-aware file integrity verification.
 
 ![Vibe FFmpeg UI](assets/screenshot.png)
 
+---
+
+## Table of Contents
+
+- [Supported Platforms](#supported-platforms)
+- [Quick Start (Windows)](#quick-start-windows)
+- [Privacy & Offline Guarantee](#privacy--offline-guarantee)
+- [Key Features](#key-features)
+- [Supported Formats & Conversions](#supported-formats--conversions)
+- [Troubleshooting](#troubleshooting)
+- [Known Limitations](#known-limitations)
+- [Project Architecture](#project-architecture)
+- [Build & Test](#build--test)
+- [License & Attributions](#license--attributions)
+
+---
+
 ## Supported Platforms
 
-- **Windows 10 / 11 (64-bit `x86_64`)**: Primary supported and tested platform.
-- **Linux / macOS**: Currently **untested and unsupported** (UI font discovery reads from `C:\Windows\Fonts`, file reveal uses `explorer.exe /select,`, and TLS uses Windows `native-tls` / SChannel).
+| Platform | Status | Notes |
+| --- | --- | --- |
+| **Windows 11 (`x86_64`)** | Supported & Tested | Primary tested platform; uses Windows fonts, `explorer.exe /select,`, and `native-tls` (SChannel). |
+| **Windows 10 (`x86_64`)** | Untested *(Likely Works)* | Not directly tested yet, but uses the same Win32 APIs and should work (WinGet auto-install requires App Installer on older builds). |
+| **Linux / macOS** | Untested / Unsupported | Not tested or supported due to Windows-specific font discovery, file reveal, and TLS integration. |
 
-## Installation & Setup (Windows)
+---
 
-No installer is needed — just `ffmpeg-ui.exe` plus `ffmpeg.exe` and `ffprobe.exe`:
+## Quick Start (Windows)
 
-1. **Download Vibe FFmpeg**: Grab `ffmpeg-ui.exe` from the [GitHub Releases](https://github.com/N213S/vibe-ffmpeg-ui/releases) page (or compile from source below).
-2. **Install FFmpeg + ffprobe** *(both binaries are required)* using any of these options:
-   - **Option A — Built-in Auto-Install via WinGet (Easiest)**:
-     - If `ffmpeg.exe` or `ffprobe.exe` is missing at launch, Vibe FFmpeg opens the **FFmpeg Setup** window automatically (you can also reopen it anytime by clicking the `FFmpeg` status pill in the top toolbar).
-     - Click **Auto-Install FFmpeg (WinGet)** to install `Gyan.FFmpeg` silently (`winget install --id Gyan.FFmpeg --exact`). Vibe FFmpeg scans WinGet links/packages and fresh Registry `PATH` automatically, so no app restart is required.
-   - **Option B — Portable (`gyan.dev`, Zero `PATH` setup)**:
-     1. Use **Check Official Version** / **Open Official Builds (`gyan.dev`)** in the **FFmpeg Setup** window (or visit [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/)) and download `ffmpeg-release-full.7z`.
-     2. Extract **`ffmpeg.exe`** and **`ffprobe.exe`** (from `bin\`) into the **same folder** next to `ffmpeg-ui.exe` (Vibe FFmpeg checks sibling executables first), then click **Re-scan FFmpeg**.
-   - **Option C — Manual System `PATH`**:
-     - Extract FFmpeg to a folder (e.g. `C:\ffmpeg`), open **Start** -> **"Edit the system environment variables"** -> **Environment Variables** -> edit **Path** -> add `C:\ffmpeg\bin` -> click **OK**, then click **Re-scan FFmpeg** (or relaunch).
-3. **Bypass Windows SmartScreen (Unsigned Executable Notice)**:
-   - Because `ffmpeg-ui.exe` is an unsigned indie open-source binary without a paid EV code-signing certificate, Windows SmartScreen (*"Windows protected your PC"*) or antivirus heuristics may flag it on first launch.
-   - Make sure you downloaded it from [`N213S/vibe-ffmpeg-ui/releases`](https://github.com/N213S/vibe-ffmpeg-ui/releases), then click **More info** -> **Run anyway** (or inspect the Rust source and build locally with `cargo build --release`).
+No traditional installer is required—just **`ffmpeg-ui.exe`** alongside **`ffmpeg.exe`** and **`ffprobe.exe`**.
+
+### 1. Download Vibe FFmpeg
+
+Grab the latest `ffmpeg-ui.exe` from the [GitHub Releases](https://github.com/N213S/vibe-ffmpeg-ui/releases) page (or build from source under [Build & Test](#build--test)).
+
+### 2. Install FFmpeg & `ffprobe` (Both Required)
+
+If FFmpeg is missing when you launch the app, the **FFmpeg Setup** window opens automatically (you can also open it anytime by clicking the `FFmpeg` status pill in the top bar).
+
+| Method | Best For | How It Works |
+| --- | --- | --- |
+| **Option A — WinGet Auto-Install** *(Easiest)* | Most users | Click **Auto-Install FFmpeg (WinGet)** to silently install `Gyan.FFmpeg` (`winget install --id Gyan.FFmpeg --exact`). Vibe FFmpeg automatically scans WinGet links/packages and Registry `PATH`—no restart needed. |
+| **Option B — Portable (`gyan.dev`)** | Zero `PATH` changes | Download `ffmpeg-release-full.7z` from [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/) (or via the **FFmpeg Setup** links), extract **`ffmpeg.exe`** and **`ffprobe.exe`** from `bin\` next to `ffmpeg-ui.exe`, then click **Re-scan FFmpeg**. |
+| **Option C — Manual System `PATH`** | Existing setups | Extract FFmpeg (e.g. `C:\ffmpeg`), add `C:\ffmpeg\bin` to System/User `PATH` in Windows Environment Variables, then click **Re-scan FFmpeg** or relaunch. |
+
+### 3. Windows SmartScreen Notice
+
+> [!NOTE]
+> `ffmpeg-ui.exe` is an unsigned open-source binary without a paid EV code-signing certificate, so Windows SmartScreen (*"Windows protected your PC"*) or antivirus heuristics may show a warning on first launch.
+>
+> Verify that you downloaded it from [`N213S/vibe-ffmpeg-ui/releases`](https://github.com/N213S/vibe-ffmpeg-ui/releases), then click **More info** → **Run anyway** (or inspect the source and compile locally with `cargo build --release`).
+
+---
 
 ## Privacy & Offline Guarantee
 
-- **100% Local Processing**: Media probing (`ffprobe`), conversion (`ffmpeg`), atomic temporary staging, and output verification run completely offline on your machine. **No media files, filenames, usage analytics, or telemetry are ever uploaded to any cloud server.** The only file saved locally is your UI language preference (`%APPDATA%\vibe-ffmpeg\preferences.json`).
-- **Minimal Network Usage (Manual Update Checks Only)**: The app never phones home on startup. Outbound HTTPS connections (8-second timeout via Windows `native-tls`) occur **only** when explicitly clicked:
-  - **Check Update** (top toolbar): Queries strict allowlisted GitHub Releases (`https://api.github.com/repos/N213S/vibe-ffmpeg-ui/releases?per_page=5`, 32 KB read cap) to check for newer Vibe FFmpeg releases.
-  - **Check Official Version** (inside **FFmpeg Setup**): Queries strict allowlisted `https://www.gyan.dev/ffmpeg/builds/release-version` and `git-version` endpoints (2 KB read cap) for official FFmpeg builds.
-  - **Auto-Install FFmpeg (WinGet)**: Runs `winget.exe` (`Gyan.FFmpeg`) only when clicked by the user.
+- **100% Local Media Processing**: Probing (`ffprobe`), converting (`ffmpeg`), atomic staging, and integrity verification all run offline on your machine. **No media files, filenames, analytics, or telemetry are ever uploaded.**
+- **Local Preferences Only**: The only file written for app state is your chosen UI language in `%APPDATA%\vibe-ffmpeg\preferences.json`.
+- **Manual-Only Network Requests**: The app never phones home on startup. Outbound HTTPS requests (8-second timeout via Windows `native-tls`) run **only** when you click a button:
 
-## Features & Architecture
+| Action | Endpoint / Mechanism | Purpose & Cap |
+| --- | --- | --- |
+| **Check Update** *(top bar)* | `https://api.github.com/repos/N213S/vibe-ffmpeg-ui/releases?per_page=5` | Checks for newer Vibe FFmpeg releases (`32 KB` read cap). |
+| **Check Official Version** *(FFmpeg Setup)* | `https://www.gyan.dev/ffmpeg/builds/release-version` & `git-version` | Checks latest official FFmpeg builds (`2 KB` read cap). |
+| **Auto-Install FFmpeg (WinGet)** | `winget.exe` (`Gyan.FFmpeg`) | Installs FFmpeg only when explicitly clicked. |
 
-- **53 Output Formats, 17 Quick Presets & Searchable `FROM -> TO` Picker (`ConvertMode`)**:
-  - **Video (17 formats)**: `MP4`, `MKV`, `MOV`, `WEBM`, `AVI`, `FLV`, `TS`, `M2TS`, `MXF`, `3GP`, `M4V`, `MPG`, `MPEG`, `VOB`, `OGV`, `WMV`, `DV` with software/hardware encoders (`libx264`, `libx265`, `libsvtav1`, `libvpx-vp9`, `mpeg2video`, `libtheora`, `wmv2`, `dvvideo`, NVENC, AMF, QSV).
-  - **Audio Only (18 formats)**: `MP3`, `WAV`, `FLAC`, `AAC`, `M4A`, `OGG`, `OPUS`, `WMA`, `AIFF`, `AC3`, `EAC3`, `DTS`, `ALAC`, `AMR`, `CAF`, `MKA`, `MP2`, `WV` with automatic `-vn` video stripping.
-  - **Image / Animated (13 formats)**: `PNG`, `JPG`, `WEBP`, `GIF` (`palettegen` + `paletteuse`), `AVIF`, `APNG`, `BMP`, `TIFF`, `TGA`, `ICO` (auto-capped `<=256x256`), `JXL`, `EXR`, `HDR`.
-  - **Subtitle (5 formats)**: `SRT`, `ASS`, `SSA`, `VTT`, `LRC` extraction and cross-conversion (`-vn -an`).
-  - **Remux (Fast Copy, 10 containers)**: Container switching (`-c copy`) for `MP4`, `MKV`, `MOV`, `WEBM`, `AVI`, `FLV`, `TS`, `M2TS`, `M4V`, `MKA` without re-encoding.
-  - **Expanded Input Support**: Accepts legacy, camera, audio, RAW/HDR image, and subtitle formats (`.rm`, `.rmvb`, `.heic`, `.heif`, `.ape`, `.mod`, `.tod`, `.bik`, `.mts`, `.m2ts`, `.vob`, `.asf`, `.dv`, `.swf`, `.mka`, `.amr`, `.caf`, `.wv`, `.tta`, `.tga`, `.exr`, `.hdr`, `.lrc`, `.srt`, `.ass`, `.ssa`, `.vtt`, `.sub`, etc.) via `rfd` filters (including `*` All Files) and drag-and-drop.
-- **Stream-Driven Compatibility & Cross-Category Conversions**:
-  - `ffprobe` inspects queued files for video, audio, subtitle (`has_text_subtitles`), embedded cover art, and still images (`is_still_image`), automatically switching an incompatible mode when the first file finishes probing and disabling unsupported categories/presets with hover tooltips.
-  - Supports **Image/GIF -> Video** (`-loop 1` + configurable duration + even-dimension scaling), **Audio -> Video** (`showwaves` 720p visualizer), **Audio -> Image** (embedded cover art extraction or `showwavespic`), **Video -> Static/Animated Image**, and **Video/Subtitle -> Subtitle**.
-- **Custom Output Filenames & Collision Safety**:
-  - Per-file editable output base name in the queue with auto-synced extension when switching formats, plus optional global Prefix/Suffix.
-  - Automatic `_out` / `(N)` collision protection so an active input file is never overwritten in-place.
-- **Atomic Staging & Mode-Aware Verification**:
-  - Stages output to `.<stem>.<pid>_<job_id>.tmp.<ext>` with explicit `-f <muxer>` flags, verifies streams/duration/subtitles via `ffprobe` + deep decode check (`ffmpeg -v error -xerror -f null -`, `RIFF`/`WEBP` header check for animated WebP, or `ffprobe` header check for Subtitle mode) according to `ConvertMode`, and atomically commits only on success.
-- **Resizable & Pop-out Native OS Diagnostic Logs (`src/ui/log_panel.rs`)**:
-  - Drag the top edge of the expanded bottom log drawer to resize vertically, or click **Pop Out Window** to open a real, independent OS window (`egui` multi-viewport via `show_viewport_immediate`, with `EmbeddedWindow` fallback) that can be dragged outside the main window or across monitors, with **Copy All** and **Clear Log** actions.
-- **Built-in FFmpeg Setup & Separate Update Checks (`src/ui/ffmpeg_setup_window.rs`, `src/net/`)**:
-  - Clicking the top-bar `FFmpeg` status pill (or launching without FFmpeg) opens an independent **FFmpeg Setup** OS window with one-click `Gyan.FFmpeg` WinGet auto-install, `gyan.dev` version checks, official download links, and live binary re-scanning (sibling folder -> `PATH` -> WinGet Links/Packages -> Windows Registry `HKCU`/`HKLM` `Path`).
-  - Top-bar **Check Update** checks GitHub Releases for newer Vibe FFmpeg versions (`v0.2.2+`) and links directly to the release page for manual download.
-- **14 Persistent UI Languages (`src/i18n/`)**:
-  - Supports `EN`, `TH`, `JA`, `ZH-CN`, `ZH-TW`, `KO`, `VI`, `ID`, `ES`, `PT-BR`, `FR`, `DE`, `IT`, and `RU` in an independent searchable OS window, persisted across restarts in `%APPDATA%\vibe-ffmpeg\preferences.json` (all translations generated by AI).
+---
 
-## Troubleshooting Failed Conversions
+## Key Features
 
-When a job shows a red **Failed** badge, the temporary staging file (`.tmp.<ext>`) is deleted automatically so partial/corrupted files are never kept. Check the exact cause quickly:
+### Dual Workspace Modes
+- **Convert Mode (`FFmpeg`)**: Batch conversion queue with presets, searchable `FROM -> TO` format picker, codec/quality controls, and live command preview.
+- **Inspect Mode (`ffprobe`)**: Read-only deep file analyzer displaying container/demuxer details (`format`, `size`, `duration`, `bitrate`, `start_time`, `probe_score`), metadata tags, per-stream attributes (codec, profile, tag, resolution, pixel format, color space/range/transfer/primaries, FPS, frames, audio channels/sample rate, language, title, stream tags), and a collapsible raw `ffprobe` JSON viewer.
+  - **Copy Report**: Copies the complete container, metadata, and stream breakdown to the clipboard.
+  - **Export (`TXT`, `Markdown`, `HTML`, `JSON`, `CSV`)**: Saves the full inspection report via a native save dialog with HTML-escaped metadata and sanitized filenames.
 
-1. **Open or Pop Out the Diagnostic Log**: Click **`▶ Diagnostic & Verification Log`** (drag its top border up to resize) or click **Pop Out Window** at the bottom-left to view the full `[Run]` command and FFmpeg's raw `stderr` error message in a separate OS window (use **Copy All** to copy logs cleanly; also check **Live Complete Command Preview** in the right panel).
-2. **`FFmpeg / ffprobe missing on PATH` (or `ffprobe not found`)**: Both `ffmpeg.exe` and `ffprobe.exe` must be present together in `PATH` or beside `ffmpeg-ui.exe`.
-3. **Hardware encoder fails (`*_nvenc`, `*_amf`, `*_qsv`)**: Drivers or older GPUs may reject certain pixel formats (such as `yuv420p10le`) or settings even when `-encoders` lists them. Switch **Video Codec** to software `H.264 / AVC (libx264)` or `H.265 / HEVC (libx265)` with `yuv420p (8-bit Universal)`.
-4. **Mode / Stream gating**: UI compatibility gating evaluates the **first queued file's** probed streams (`has_video`, `has_audio`, `has_subtitle`, `is_still_image`) to disable incompatible categories/presets. If a mixed batch includes different media types, trailing incompatible items fail cleanly — check the Diagnostic Log for per-file details.
-5. **Remux (`-c copy`) container incompatibility**: Switching containers without re-encoding fails if the source codec is incompatible with the target format (for example, copying `H.264`/`AAC` into `WebM`, which requires `VP9`/`AV1` + `Opus`/`Vorbis`). Try **`MKV`** for remuxing, or switch to **Video** mode to re-encode.
-6. **Subtitle extraction / muxing failures**: Image-based subtitles (such as Blu-ray PGS or DVD VobSub) cannot convert to `mov_text` (in MP4/MOV/M4V) or text-only subtitle targets (`SRT`, `ASS`, `SSA`, `VTT`, `LRC`). Uncheck **Keep text subtitles** or output to **MKV** when converting video; use text-based subtitle inputs for **Subtitle** mode.
-7. **Missing codecs/demuxers in minimal FFmpeg builds**: If `AVIF`, `AV1`, `JXL`, `HEIC`, `ALAC`, `AMR`, `RMVB`, or `WebP` fails with unknown/missing encoder or decoder errors, switch to a **full** FFmpeg build from `gyan.dev` (`ffmpeg-release-full.7z`).
-8. **File permissions / path issues**: Ensure the selected output folder is writable and not locked by another media player.
+### Smart Stream & Compatibility Gating
+- `ffprobe` inspects queued files for video, audio, text subtitles (`has_text_subtitles`), embedded cover art, and still images (`is_still_image`).
+- Automatically switches out of an incompatible mode when the first file finishes probing and disables unsupported categories or presets with clear hover tooltips.
+
+### Safety, Naming & Integrity Verification
+- **Collision & Input Protection**: Editable per-file output base names with auto-synced extensions, optional global prefix/suffix, and automatic `_out` / `(N)` collision naming so source files are never overwritten in-place.
+- **Atomic Staging**: Writes output to `.<stem>.<pid>_<job_id>.tmp.<ext>` with explicit `-f <muxer>` flags and commits to the final filename only after verification passes.
+- **Mode-Aware Deep Verification**: Checks output streams, duration, and subtitles with `ffprobe`, runs a deep decode pass (`ffmpeg -v error -xerror -f null -`), validates `RIFF`/`WEBP` signatures for animated WebP, or checks subtitle stream headers in Subtitle mode.
+
+### Pop-Out Logs, Built-in Setup & 14 Languages
+- **Resizable & Pop-Out Diagnostic Logs**: Drag the top border of the bottom log drawer to resize, or click **Pop Out Window** to open an independent native OS window (`egui` multi-viewport with embedded fallback) featuring **Copy All** and **Clear Log**.
+- **Built-in FFmpeg Setup & App Update Checker**: Separate OS window for WinGet auto-install, `gyan.dev` version checks, and live binary re-scanning (sibling folder → `PATH` → WinGet Links/Packages → Registry `HKCU`/`HKLM` `Path`).
+- **14 Persistent UI Languages**: `EN`, `TH`, `JA`, `ZH-CN`, `ZH-TW`, `KO`, `VI`, `ID`, `ES`, `PT-BR`, `FR`, `DE`, `IT`, and `RU` via a searchable language window (AI-generated translations).
+
+---
+
+## Supported Formats & Conversions
+
+Includes **53 output formats**, **17 quick presets**, and a searchable **`FROM -> TO`** format picker:
+
+| Category | Count | Formats & Highlights |
+| --- | --- | --- |
+| **Video** | 17 | `MP4`, `MKV`, `MOV`, `WEBM`, `AVI`, `FLV`, `TS`, `M2TS`, `MXF`, `3GP`, `M4V`, `MPG`, `MPEG`, `VOB`, `OGV`, `WMV`, `DV` — software & hardware encoders (`libx264`, `libx265`, `libsvtav1`, `libvpx-vp9`, `mpeg2video`, `libtheora`, `wmv2`, `dvvideo`, NVENC, AMF, QSV). |
+| **Audio Only** | 18 | `MP3`, `WAV`, `FLAC`, `AAC`, `M4A`, `OGG`, `OPUS`, `WMA`, `AIFF`, `AC3`, `EAC3`, `DTS`, `ALAC`, `AMR`, `CAF`, `MKA`, `MP2`, `WV` — automatic `-vn` video stripping. |
+| **Image / Animated** | 13 | `PNG`, `JPG`, `WEBP`, `GIF` (`palettegen` + `paletteuse`), `AVIF`, `APNG`, `BMP`, `TIFF`, `TGA`, `ICO` (auto-capped `<=256x256`), `JXL`, `EXR`, `HDR`. |
+| **Subtitle** | 5 | `SRT`, `ASS`, `SSA`, `VTT`, `LRC` — text subtitle extraction and cross-conversion (`-vn -an`). |
+| **Remux (Fast Copy)** | 10 | `MP4`, `MKV`, `MOV`, `WEBM`, `AVI`, `FLV`, `TS`, `M2TS`, `M4V`, `MKA` — lossless container switching (`-c copy`) without re-encoding. |
+
+- **Cross-Category Conversions**:
+  - **Image / GIF → Video**: `-loop 1`, configurable duration, and even-dimension scaling.
+  - **Audio → Video**: `showwaves` 720p waveform visualizer.
+  - **Audio → Image**: Extracts embedded cover art or generates a `showwavespic` waveform image.
+  - **Video → Image / Animated Image** and **Video / Subtitle → Subtitle**.
+- **Expanded Input Support**: Accepts legacy, camera, audio, RAW/HDR image, and subtitle inputs (`.rm`, `.rmvb`, `.heic`, `.heif`, `.ape`, `.mod`, `.tod`, `.bik`, `.mts`, `.m2ts`, `.vob`, `.asf`, `.dv`, `.swf`, `.mka`, `.amr`, `.caf`, `.wv`, `.tta`, `.tga`, `.exr`, `.hdr`, `.lrc`, `.srt`, `.ass`, `.ssa`, `.vtt`, `.sub`, etc.) via file picker filters (including `*` All Files) and drag-and-drop.
+
+---
+
+## Troubleshooting
+
+When a job shows a red **Failed** badge, its temporary staging file (`.tmp.<ext>`) is deleted automatically so broken outputs are never left behind.
+
+| Issue | Likely Cause & Fix |
+| --- | --- |
+| **Need the exact FFmpeg error** | Open **`▶ Diagnostic & Verification Log`** (drag the top border up to resize) or click **Pop Out Window** to inspect the `[Run]` command and raw `stderr`, or check **Live Complete Command Preview** in the right panel. |
+| **`FFmpeg / ffprobe missing on PATH`** | Both `ffmpeg.exe` and `ffprobe.exe` must exist together in `PATH` or in the same folder as `ffmpeg-ui.exe`. |
+| **Hardware encoder fails (`*_nvenc`, `*_amf`, `*_qsv`)** | Your GPU/driver may reject certain pixel formats (e.g. `yuv420p10le`) even if listed. Switch **Video Codec** to software `H.264 / AVC (libx264)` or `H.265 / HEVC (libx265)` with `yuv420p (8-bit Universal)`. |
+| **Mixed-file batch failures** | Compatibility gating evaluates the **first queued file**; trailing incompatible files in a mixed batch fail cleanly—check the Diagnostic Log for per-file details. |
+| **Remux (`-c copy`) fails** | Source codecs are incompatible with the target container (e.g., `H.264`/`AAC` into `WebM`, which requires `VP9`/`AV1` + `Opus`/`Vorbis`). Try **`MKV`** or switch to **Video** mode to re-encode. |
+| **Subtitle extraction / muxing fails** | Image-based subtitles (Blu-ray PGS, DVD VobSub) cannot convert to `mov_text` (`MP4`/`MOV`/`M4V`) or text formats (`SRT`/`ASS`/`SSA`/`VTT`/`LRC`). Uncheck **Keep text subtitles** or output to **MKV**. |
+| **Missing codec/demuxer errors** | Formats like `AVIF`, `AV1`, `JXL`, `HEIC`, `ALAC`, `AMR`, `RMVB`, or `WebP` may be missing from minimal FFmpeg builds. Install a **full** build (`ffmpeg-release-full.7z` from `gyan.dev`). |
+| **Permission or file-lock errors** | Make sure the destination folder is writable and the target file is not open in another media player. |
+
+---
 
 ## Known Limitations
 
-- **Windows-only tested**: No Linux or macOS verification or prebuilt binaries yet.
-- **Partial preference persistence**: The selected UI language persists across restarts (`%APPDATA%\vibe-ffmpeg\preferences.json`), while output folder, prefix/suffix, and encoding parameters currently reset on launch.
-- **Single batch profile & first-item gating**: Queue settings apply globally to all pending items in the batch (only the output filename stem is customizable per file), UI compatibility gating inspects the first queued file, and **Quick Presets** covers Video/Audio/Image/Remux modes (use the `FROM -> TO` picker for Subtitle targets).
-- **Non-Latin glyph alignment quirks**: Minor floating diacritics, tone marks, or alignment glitches may appear in some non-Latin scripts (such as Thai or Japanese) due to `egui` text layout limitations; translations across all 14 languages are AI-generated and may contain minor phrasing inaccuracies (no RTL support yet).
-- **Animated WebP decode verification**: FFmpeg's built-in `webp` decoder does not support decoding multi-frame `ANIM` WebP streams, so deep verification checks `RIFF` and `WEBP` container header signature bytes (`RIFF/ANIM Verified`) rather than decoding individual frames.
-- **No timeline editing**: Designed for batch conversion, extraction, image/GIF creation, subtitle extraction, and remuxing — does not support interactive trimming, cropping UI, or merging multiple files.
+- **Tested on Windows 11 only**: Windows 10 has not been directly tested yet (though it should likely work), and Linux/macOS are untested and unsupported.
+- **Partial Preference Persistence**: Only the selected UI language persists (`%APPDATA%\vibe-ffmpeg\preferences.json`); output folder, prefix/suffix, and encoding parameters reset on launch.
+- **Single Batch Profile**: Queue settings apply globally to all pending jobs (only the output filename stem is editable per file), compatibility gating checks the first queued item, and **Quick Presets** covers Video/Audio/Image/Remux (use `FROM -> TO` for Subtitle targets).
+- **Non-Latin Text Layout**: Minor floating diacritics, tone marks, or alignment quirks may appear in scripts like Thai or Japanese due to `egui` layout behavior; all 14 translations are AI-generated and RTL scripts are not yet supported.
+- **Animated WebP Verification**: FFmpeg's built-in `webp` decoder cannot decode multi-frame `ANIM` streams, so deep verification validates `RIFF` and `WEBP` container signatures (`RIFF/ANIM Verified`) rather than decoding individual frames.
+- **No Timeline Editing**: Built for batch conversion, extraction, inspection, and remuxing—interactive trimming, visual cropping, and multi-file merging are not included.
 
-## Modules
+---
 
-- `src/main.rs` — Window bootstrap and Windows GUI subsystem entry point.
-- `src/app.rs` — App state, worker event dispatch, automatic compatible-mode selection on probe, `rfd` multi-format file dialogs, and drag-and-drop handling.
-- `src/models/` — `ConvertMode`, `ContainerFormat`, `ConversionSettings`, `PresetProfile`, `IncompatibilityReason`, `check_mode_compatibility`, `MediaInfo`, `QueuedFile`.
-- `src/security/path_guard.rs` — Path canonicalization, media extension registries (`VIDEO_EXTENSIONS`, `AUDIO_EXTENSIONS`, `IMAGE_EXTENSIONS`, `SUBTITLE_EXTENSIONS`), `TRUSTED_HTTPS_PREFIXES` allowlist, `%APPDATA%\vibe-ffmpeg\preferences.json` persistence, filename sanitization, prefix/suffix composition, collision protection, and `.tmp.<ext>` staging.
-- `src/ffmpeg/` — `discovery.rs` (sibling/`PATH`/WinGet/Registry discovery), `installer.rs` (non-interactive WinGet `Gyan.FFmpeg` runner), `probe.rs`, `command_builder.rs`, `validator.rs`, `runner.rs`.
-- `src/net/` — `app_update.rs` (GitHub Releases app update check) and `ffmpeg_update.rs` (HTTPS official `gyan.dev` FFmpeg check).
-- `src/i18n/` — 14-language localization tables with English fallback.
-- `src/ui/` — `theme.rs`, `top_bar.rs`, `queue_panel.rs`, `settings_panel.rs` (presets & searchable `FROM -> TO` picker), `log_panel.rs` (docked drawer & native OS window), `language_window.rs` (searchable native OS window), `ffmpeg_setup_window.rs` (WinGet auto-install & official FFmpeg download OS window).
+## Project Architecture
+
+| Module | Responsibility |
+| --- | --- |
+| `src/main.rs` | Window bootstrap and Windows GUI subsystem entry point. |
+| `src/app.rs` | App state, worker event dispatch, auto-compatible mode selection, `rfd` dialogs, drag-and-drop, and report export wiring. |
+| `src/models/` | `ConvertMode`, `ContainerFormat`, `ConversionSettings`, `PresetProfile`, `IncompatibilityReason`, `check_mode_compatibility`, `MediaInfo`, `QueuedFile`. |
+| `src/security/path_guard.rs` | Path canonicalization, extension registries, `TRUSTED_HTTPS_PREFIXES` allowlist, language persistence, filename sanitization, collision protection, and `.tmp.<ext>` staging. |
+| `src/ffmpeg/` | `discovery.rs` (sibling/`PATH`/WinGet/Registry), `installer.rs` (WinGet `Gyan.FFmpeg`), `probe.rs`, `report_export.rs` (TXT/MD/HTML/JSON/CSV), `command_builder.rs`, `validator.rs`, `runner.rs`. |
+| `src/net/` | `app_update.rs` (GitHub Releases update check) and `ffmpeg_update.rs` (`gyan.dev` version check). |
+| `src/i18n/` | 14-language localization tables with English fallback. |
+| `src/ui/` | `theme.rs`, `top_bar.rs`, `queue_panel.rs`, `settings_panel.rs`, `inspector_panel.rs`, `log_panel.rs`, `language_window.rs`, `ffmpeg_setup_window.rs`. |
+
+---
 
 ## Build & Test
 
@@ -105,8 +170,10 @@ cargo test
 cargo build --release
 ```
 
+---
+
 ## License & Attributions
 
-- Repository: [github.com/N213S/vibe-ffmpeg-ui](https://github.com/N213S/vibe-ffmpeg-ui)
-- Licensed under the [MIT License](LICENSE).
-- Third-party Rust crates, embedded font licenses, and external tool credits are listed in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+- **Repository**: [github.com/N213S/vibe-ffmpeg-ui](https://github.com/N213S/vibe-ffmpeg-ui)
+- **License**: [MIT License](LICENSE)
+- **Third-Party Credits**: Rust crates, embedded font licenses, and external tool credits are documented in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).

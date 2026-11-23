@@ -1,11 +1,11 @@
 use crate::i18n::{Language, media_summary_localized, tr, verification_note_localized};
 use crate::models::config::ConversionSettings;
-use crate::models::media::{FileStatus, QueuedFile, format_bytes, format_duration};
+use crate::models::media::{AppWorkspaceMode, FileStatus, QueuedFile, format_bytes, format_duration};
 use crate::security::path_guard::compose_output_filename;
 use crate::ui::theme::{
     ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, card_frame, status_pill,
 };
-use eframe::egui::{self, Label, ProgressBar, RichText, TextEdit};
+use eframe::egui::{self, Label, ProgressBar, RichText, Stroke, TextEdit};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -13,14 +13,19 @@ use std::process::{Command, Stdio};
 pub struct QueueActions {
     pub remove_file_id: Option<u64>,
     pub add_files_clicked: bool,
+    pub select_file_id: Option<u64>,
+    pub inspect_file_id: Option<u64>,
 }
 
 /// Renders the central file queue with editable output filenames, auto-synced extension, and mode-aware verification status.
+#[allow(clippy::too_many_arguments)]
 pub fn render_queue_panel(
     ui: &mut egui::Ui,
     lang: Language,
     queue: &mut [QueuedFile],
     settings: &ConversionSettings,
+    workspace_mode: AppWorkspaceMode,
+    selected_file_id: Option<u64>,
     is_running: bool,
     is_hovering_files: bool,
 ) -> QueueActions {
@@ -65,7 +70,16 @@ pub fn render_queue_panel(
         .auto_shrink([false, false])
         .show(ui, |ui| {
             for item in queue.iter_mut() {
-                render_file_card(ui, lang, item, settings, is_running, &mut actions);
+                render_file_card(
+                    ui,
+                    lang,
+                    item,
+                    settings,
+                    workspace_mode,
+                    selected_file_id,
+                    is_running,
+                    &mut actions,
+                );
                 ui.add_space(6.0);
             }
         });
@@ -73,11 +87,14 @@ pub fn render_queue_panel(
     actions
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_file_card(
     ui: &mut egui::Ui,
     lang: Language,
     item: &mut QueuedFile,
     settings: &ConversionSettings,
+    workspace_mode: AppWorkspaceMode,
+    selected_file_id: Option<u64>,
     is_running: bool,
     actions: &mut QueueActions,
 ) {
@@ -88,9 +105,29 @@ fn render_file_card(
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| item.input_path.display().to_string());
 
-    card_frame().show(ui, |ui| {
+    let is_selected_for_inspect =
+        workspace_mode == AppWorkspaceMode::Inspect && selected_file_id == Some(item.id);
+    let frame = if is_selected_for_inspect {
+        card_frame().stroke(Stroke::new(1.5, ACCENT_BLUE))
+    } else {
+        card_frame()
+    };
+
+    frame.show(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.label(RichText::new(&file_name).size(14.5).strong());
+            if workspace_mode == AppWorkspaceMode::Inspect {
+                if ui
+                    .selectable_label(
+                        selected_file_id == Some(item.id),
+                        RichText::new(&file_name).size(14.5).strong(),
+                    )
+                    .clicked()
+                {
+                    actions.select_file_id = Some(item.id);
+                }
+            } else {
+                ui.label(RichText::new(&file_name).size(14.5).strong());
+            }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let removable = !is_running
@@ -103,6 +140,9 @@ fn render_file_card(
                     );
                 if removable && ui.small_button(t.remove_btn()).clicked() {
                     actions.remove_file_id = Some(item.id);
+                }
+                if ui.small_button(t.inspect_btn()).clicked() {
+                    actions.inspect_file_id = Some(item.id);
                 }
                 render_status_badge(ui, lang, &item.status);
             });
@@ -140,47 +180,49 @@ fn render_file_card(
             );
         }
 
-        // Editable output stem + auto-synced container extension.
-        ui.add_space(4.0);
-        let ext = settings.container.extension();
-        let editable = !is_running
-            && !matches!(
-                item.status,
-                FileStatus::Converting(_) | FileStatus::Verifying
-            );
+        if workspace_mode == AppWorkspaceMode::Convert {
+            // Editable output stem + auto-synced container extension.
+            ui.add_space(4.0);
+            let ext = settings.container.extension();
+            let editable = !is_running
+                && !matches!(
+                    item.status,
+                    FileStatus::Converting(_) | FileStatus::Verifying
+                );
 
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(t.output_label()).size(12.0).color(TEXT_MUTED));
-            ui.add_enabled(
-                editable,
-                TextEdit::singleline(&mut item.custom_stem)
-                    .desired_width(210.0)
-                    .hint_text(t.output_hint()),
-            );
-            ui.label(
-                RichText::new(format!(".{ext}"))
-                    .monospace()
-                    .size(12.5)
-                    .strong()
-                    .color(ACCENT_BLUE),
-            );
-
-            if !settings.output_prefix.trim().is_empty()
-                || !settings.output_suffix.trim().is_empty()
-            {
-                let preview_name = compose_output_filename(
-                    &item.custom_stem,
-                    &settings.output_prefix,
-                    &settings.output_suffix,
-                    ext,
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(t.output_label()).size(12.0).color(TEXT_MUTED));
+                ui.add_enabled(
+                    editable,
+                    TextEdit::singleline(&mut item.custom_stem)
+                        .desired_width(210.0)
+                        .hint_text(t.output_hint()),
                 );
                 ui.label(
-                    RichText::new(format!("-> {preview_name}"))
-                        .size(11.5)
-                        .color(TEXT_MUTED),
+                    RichText::new(format!(".{ext}"))
+                        .monospace()
+                        .size(12.5)
+                        .strong()
+                        .color(ACCENT_BLUE),
                 );
-            }
-        });
+
+                if !settings.output_prefix.trim().is_empty()
+                    || !settings.output_suffix.trim().is_empty()
+                {
+                    let preview_name = compose_output_filename(
+                        &item.custom_stem,
+                        &settings.output_prefix,
+                        &settings.output_suffix,
+                        ext,
+                    );
+                    ui.label(
+                        RichText::new(format!("-> {preview_name}"))
+                            .size(11.5)
+                            .color(TEXT_MUTED),
+                    );
+                }
+            });
+        }
 
         match &item.status {
             FileStatus::Converting(stats) => {

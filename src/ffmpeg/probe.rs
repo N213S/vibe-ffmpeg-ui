@@ -1,6 +1,7 @@
 use crate::ffmpeg::discovery::configure_background_command;
-use crate::models::media::MediaInfo;
+use crate::models::media::{MediaInfo, StreamDetail};
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Command;
 
@@ -20,28 +21,48 @@ struct FfprobeError {
 #[derive(Debug, Deserialize)]
 struct FfprobeFormat {
     format_name: Option<String>,
+    format_long_name: Option<String>,
+    start_time: Option<String>,
     duration: Option<String>,
     size: Option<String>,
     bit_rate: Option<String>,
+    probe_score: Option<i32>,
+    #[serde(default)]
+    tags: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct FfprobeStream {
+    index: Option<usize>,
     codec_type: Option<String>,
     codec_name: Option<String>,
+    codec_long_name: Option<String>,
+    profile: Option<String>,
+    codec_tag_string: Option<String>,
     width: Option<u32>,
     height: Option<u32>,
     pix_fmt: Option<String>,
+    color_space: Option<String>,
+    color_range: Option<String>,
+    color_transfer: Option<String>,
+    color_primaries: Option<String>,
     r_frame_rate: Option<String>,
     avg_frame_rate: Option<String>,
     nb_frames: Option<String>,
+    duration: Option<String>,
+    bit_rate: Option<String>,
     disposition: Option<FfprobeDisposition>,
     sample_rate: Option<String>,
     channels: Option<u32>,
+    channel_layout: Option<String>,
+    #[serde(default)]
+    tags: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 struct FfprobeDisposition {
+    #[serde(default)]
+    default: i32,
     #[serde(default)]
     attached_pic: i32,
 }
@@ -93,16 +114,23 @@ pub fn parse_ffprobe_json(json_str: &str, exit_ok: bool) -> Result<MediaInfo, St
         return Err("ffprobe exited with non-zero status".to_string());
     }
 
-    let mut info = MediaInfo::default();
+    let mut info = MediaInfo {
+        raw_json: json_str.trim().to_string(),
+        ..Default::default()
+    };
 
     if let Some(fmt) = parsed.format {
         info.format_name = fmt.format_name.unwrap_or_default();
+        info.format_long_name = fmt.format_long_name;
+        info.start_time_secs = fmt.start_time.and_then(|s| s.parse::<f64>().ok());
         info.duration_secs = fmt.duration.and_then(|s| s.parse::<f64>().ok());
         info.file_size_bytes = fmt
             .size
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
         info.bit_rate = fmt.bit_rate.and_then(|s| s.parse::<u64>().ok());
+        info.probe_score = fmt.probe_score;
+        info.format_tags = fmt.tags.into_iter().collect();
     }
 
     let fmt_lower = info.format_name.to_ascii_lowercase();
@@ -111,16 +139,58 @@ pub fn parse_ffprobe_json(json_str: &str, exit_ok: bool) -> Result<MediaInfo, St
         || fmt_lower == "ico"
         || fmt_lower.contains(",ico");
 
-    for stream in parsed.streams {
+    for (idx, stream) in parsed.streams.into_iter().enumerate() {
         let kind = stream.codec_type.as_deref().unwrap_or("");
+        let stream_fps = parse_fraction(
+            stream
+                .avg_frame_rate
+                .as_deref()
+                .filter(|r| *r != "0/0")
+                .or(stream.r_frame_rate.as_deref()),
+        );
+        let is_default = stream.disposition.as_ref().is_some_and(|d| d.default == 1);
+        let attached_pic = stream
+            .disposition
+            .as_ref()
+            .is_some_and(|d| d.attached_pic == 1);
+
+        info.streams.push(StreamDetail {
+            index: stream.index.unwrap_or(idx),
+            codec_type: kind.to_string(),
+            codec_name: stream
+                .codec_name
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
+            codec_long_name: stream.codec_long_name.clone(),
+            profile: stream.profile.clone(),
+            codec_tag_string: stream.codec_tag_string.clone(),
+            width: stream.width,
+            height: stream.height,
+            pixel_format: stream.pix_fmt.clone(),
+            color_space: stream.color_space.clone(),
+            color_range: stream.color_range.clone(),
+            color_transfer: stream.color_transfer.clone(),
+            color_primaries: stream.color_primaries.clone(),
+            fps: stream_fps,
+            avg_frame_rate: stream.avg_frame_rate.clone(),
+            r_frame_rate: stream.r_frame_rate.clone(),
+            nb_frames: stream.nb_frames.as_deref().and_then(|s| s.parse::<u64>().ok()),
+            duration_secs: stream.duration.as_deref().and_then(|s| s.parse::<f64>().ok()),
+            bit_rate: stream.bit_rate.as_deref().and_then(|s| s.parse::<u64>().ok()),
+            sample_rate: stream.sample_rate.as_deref().and_then(|s| s.parse::<u32>().ok()),
+            channels: stream.channels,
+            channel_layout: stream.channel_layout.clone(),
+            language: stream.tags.get("language").cloned(),
+            title: stream.tags.get("title").cloned(),
+            is_default,
+            is_attached_pic: attached_pic,
+            tags: stream.tags.into_iter().collect(),
+        });
+
         match kind {
             "video" if !info.has_video => {
                 info.has_video = true;
                 let codec = stream.codec_name.clone().unwrap_or_default();
-                let attached_pic = stream
-                    .disposition
-                    .as_ref()
-                    .is_some_and(|d| d.attached_pic == 1);
                 let is_animated_img_codec = matches!(codec.as_str(), "gif" | "webp" | "apng");
                 let is_static_img_codec = matches!(
                     codec.as_str(),
@@ -140,13 +210,7 @@ pub fn parse_ffprobe_json(json_str: &str, exit_ok: bool) -> Result<MediaInfo, St
                 info.width = stream.width;
                 info.height = stream.height;
                 info.pixel_format = stream.pix_fmt;
-                info.fps = parse_fraction(
-                    stream
-                        .avg_frame_rate
-                        .as_deref()
-                        .filter(|r| *r != "0/0")
-                        .or(stream.r_frame_rate.as_deref()),
-                );
+                info.fps = stream_fps;
             }
             "audio" if !info.has_audio => {
                 info.has_audio = true;
@@ -238,5 +302,11 @@ mod tests {
         assert_eq!(info.height, Some(1080));
         assert!((info.fps.unwrap() - 29.97).abs() < 0.02);
         assert_eq!(info.audio_sample_rate, Some(48000));
+        assert_eq!(info.streams.len(), 2);
+        assert_eq!(info.streams[0].codec_type, "video");
+        assert_eq!(info.streams[1].codec_type, "audio");
+        let report = info.formatted_report(Path::new("sample.mp4"));
+        assert!(report.contains("mov,mp4,m4a,3gp,3g2,mj2"));
+        assert!(report.contains("1920x1080"));
     }
 }

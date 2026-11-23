@@ -1,5 +1,5 @@
 use crate::i18n::{Language, tr};
-use crate::models::media::{APP_VERSION, AppUpdateState, LocalFfmpegInfo};
+use crate::models::media::{APP_VERSION, AppUpdateState, AppWorkspaceMode, LocalFfmpegInfo};
 use crate::net::ffmpeg_update::open_trusted_url;
 use crate::ui::theme::{ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, status_pill};
 use eframe::egui::{self, Button, Color32, CornerRadius, Label, RichText, Stroke};
@@ -15,14 +15,18 @@ pub struct TopBarActions {
     pub check_updates: bool,
     pub toggle_language: bool,
     pub open_setup: bool,
+    pub set_workspace_mode: Option<AppWorkspaceMode>,
+    pub reprobe_all: bool,
 }
 
 /// Renders the header bar: binary status, official app update checker, language switcher, and queue actions.
+#[allow(clippy::too_many_arguments)]
 pub fn render_top_bar(
     ui: &mut egui::Ui,
     lang: Language,
     ffmpeg: &LocalFfmpegInfo,
     app_update_state: &AppUpdateState,
+    workspace_mode: AppWorkspaceMode,
     is_running: bool,
     has_pending_work: bool,
     queue_len: usize,
@@ -142,6 +146,33 @@ pub fn render_top_bar(
     ui.add_space(6.0);
 
     ui.horizontal_wrapped(|ui| {
+        let inactive_mode_bg = Color32::from_rgb(35, 42, 58);
+        let convert_selected = workspace_mode == AppWorkspaceMode::Convert;
+        let convert_btn = Button::new(RichText::new(t.workspace_mode_convert()).strong())
+            .selected(convert_selected)
+            .fill(if convert_selected {
+                ACCENT_BLUE
+            } else {
+                inactive_mode_bg
+            });
+        if ui.add(convert_btn).clicked() {
+            actions.set_workspace_mode = Some(AppWorkspaceMode::Convert);
+        }
+
+        let inspect_selected = workspace_mode == AppWorkspaceMode::Inspect;
+        let inspect_btn = Button::new(RichText::new(t.workspace_mode_inspect()).strong())
+            .selected(inspect_selected)
+            .fill(if inspect_selected {
+                ACCENT_BLUE
+            } else {
+                inactive_mode_bg
+            });
+        if ui.add(inspect_btn).clicked() {
+            actions.set_workspace_mode = Some(AppWorkspaceMode::Inspect);
+        }
+
+        ui.separator();
+
         if ui
             .add_enabled(!is_running, Button::new(t.add_media_files()))
             .clicked()
@@ -162,7 +193,20 @@ pub fn render_top_bar(
         }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if is_running {
+            if workspace_mode == AppWorkspaceMode::Inspect {
+                let can_reprobe =
+                    !is_running && queue_len > 0 && ffmpeg.ffprobe_path.is_some();
+                let reprobe_btn = Button::new(RichText::new(t.reprobe_btn()).strong()).fill(
+                    if can_reprobe {
+                        ACCENT_BLUE
+                    } else {
+                        Color32::from_gray(55)
+                    },
+                );
+                if ui.add_enabled(can_reprobe, reprobe_btn).clicked() {
+                    actions.reprobe_all = true;
+                }
+            } else if is_running {
                 let stop_btn = Button::new(RichText::new(t.stop_batch()).strong())
                     .fill(ACCENT_RED);
                 if ui.add(stop_btn).clicked() {

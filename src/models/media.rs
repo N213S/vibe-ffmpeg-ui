@@ -1,12 +1,59 @@
-use std::path::PathBuf;
+use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
+
+/// Top-level workspace mode: batch conversion (`FFmpeg`) or read-only file inspection (`ffprobe`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AppWorkspaceMode {
+    #[default]
+    Convert,
+    Inspect,
+}
+
+/// Detailed per-stream metadata extracted by `ffprobe`.
+#[derive(Debug, Clone, Default)]
+pub struct StreamDetail {
+    pub index: usize,
+    pub codec_type: String,
+    pub codec_name: String,
+    pub codec_long_name: Option<String>,
+    pub profile: Option<String>,
+    pub codec_tag_string: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub pixel_format: Option<String>,
+    pub color_space: Option<String>,
+    pub color_range: Option<String>,
+    pub color_transfer: Option<String>,
+    pub color_primaries: Option<String>,
+    pub fps: Option<f64>,
+    pub avg_frame_rate: Option<String>,
+    pub r_frame_rate: Option<String>,
+    pub nb_frames: Option<u64>,
+    pub duration_secs: Option<f64>,
+    pub bit_rate: Option<u64>,
+    pub sample_rate: Option<u32>,
+    pub channels: Option<u32>,
+    pub channel_layout: Option<String>,
+    pub language: Option<String>,
+    pub title: Option<String>,
+    pub is_default: bool,
+    pub is_attached_pic: bool,
+    pub tags: Vec<(String, String)>,
+}
 
 /// Parsed media stream information from `ffprobe`.
 #[derive(Debug, Clone, Default)]
 pub struct MediaInfo {
     pub format_name: String,
+    pub format_long_name: Option<String>,
     pub duration_secs: Option<f64>,
+    pub start_time_secs: Option<f64>,
     pub file_size_bytes: u64,
     pub bit_rate: Option<u64>,
+    pub probe_score: Option<i32>,
+    pub format_tags: Vec<(String, String)>,
+    pub streams: Vec<StreamDetail>,
+    pub raw_json: String,
     pub has_video: bool,
     pub has_audio: bool,
     pub has_subtitle: bool,
@@ -56,6 +103,90 @@ impl MediaInfo {
         } else {
             parts.join("  |  ")
         }
+    }
+
+    /// Generates a readable multi-line ffprobe inspection report for copying or troubleshooting.
+    pub fn formatted_report(&self, file_path: &Path) -> String {
+        let mut out = String::new();
+        let _ = writeln!(out, "File: {}", file_path.display());
+        match &self.format_long_name {
+            Some(long) if !long.is_empty() => {
+                let _ = writeln!(out, "Container: {} ({long})", self.format_name);
+            }
+            _ => {
+                let _ = writeln!(out, "Container: {}", self.format_name);
+            }
+        }
+        let _ = writeln!(
+            out,
+            "Size: {} ({} B)",
+            format_bytes(self.file_size_bytes),
+            self.file_size_bytes
+        );
+        if let Some(dur) = self.duration_secs {
+            let _ = writeln!(out, "Duration: {} ({dur:.3} s)", format_duration(dur));
+        }
+        if let Some(br) = self.bit_rate {
+            let _ = writeln!(out, "Overall Bitrate: {} kbps ({br} bps)", br / 1000);
+        }
+        if let Some(score) = self.probe_score {
+            let _ = writeln!(out, "Probe Score: {score}/100");
+        }
+
+        if !self.format_tags.is_empty() {
+            let _ = writeln!(out, "\nContainer Tags:");
+            for (k, v) in &self.format_tags {
+                let _ = writeln!(out, "  {k}: {v}");
+            }
+        }
+
+        let _ = writeln!(out, "\nStreams ({}):", self.streams.len());
+        for s in &self.streams {
+            let _ = writeln!(
+                out,
+                "  #{} [{}] {}{}",
+                s.index,
+                s.codec_type,
+                s.codec_name,
+                s.profile
+                    .as_deref()
+                    .map(|p| format!(" ({p})"))
+                    .unwrap_or_default()
+            );
+            if let (Some(w), Some(h)) = (s.width, s.height) {
+                let fps_s = s.fps.map(|f| format!(" @ {f:.3} fps")).unwrap_or_default();
+                let pix = s
+                    .pixel_format
+                    .as_deref()
+                    .map(|p| format!(" [{p}]"))
+                    .unwrap_or_default();
+                let _ = writeln!(out, "    Video: {w}x{h}{pix}{fps_s}");
+            }
+            if let Some(sr) = s.sample_rate {
+                let ch = s.channels.map(|c| format!(" {c}ch")).unwrap_or_default();
+                let layout = s
+                    .channel_layout
+                    .as_deref()
+                    .map(|l| format!(" ({l})"))
+                    .unwrap_or_default();
+                let _ = writeln!(out, "    Audio: {sr} Hz{ch}{layout}");
+            }
+            if let Some(br) = s.bit_rate {
+                let _ = writeln!(out, "    Bitrate: {} kbps", br / 1000);
+            }
+            if let Some(ref lang) = s.language {
+                let _ = writeln!(out, "    Language: {lang}");
+            }
+            if let Some(ref title) = s.title {
+                let _ = writeln!(out, "    Title: {title}");
+            }
+            for (k, v) in &s.tags {
+                if k != "language" && k != "title" {
+                    let _ = writeln!(out, "    Tag {k}: {v}");
+                }
+            }
+        }
+        out
     }
 }
 

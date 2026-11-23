@@ -428,6 +428,22 @@ define_translations!(
     setup_open_download_btn,
     setup_rescan_btn,
     setup_official_release_prefix,
+    // ffprobe file inspector mode
+    workspace_mode_convert,
+    workspace_mode_inspect,
+    inspect_btn,
+    reprobe_btn,
+    inspector_title,
+    inspector_empty_hint,
+    inspector_container_section,
+    inspector_streams_section,
+    inspector_metadata_section,
+    inspector_raw_json,
+    inspector_copy_report,
+    inspector_copy_json,
+    inspector_format_label,
+    inspector_duration_label,
+    inspector_bitrate_label,
 );
 
 const fn raw_table(lang: Language) -> &'static RawTranslations {

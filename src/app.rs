@@ -5,8 +5,8 @@ use crate::ffmpeg::runner::{BatchJobItem, spawn_batch_conversion};
 use crate::i18n::{Language, tr};
 use crate::models::config::{ConversionSettings, ConvertMode, check_mode_compatibility};
 use crate::models::media::{
-    AppUpdateState, FfmpegInstallState, FileStatus, LocalFfmpegInfo, ProgressStats, QueuedFile,
-    UpdateCheckState, WorkerEvent,
+    AppUpdateState, AppWorkspaceMode, FfmpegInstallState, FileStatus, LocalFfmpegInfo,
+    ProgressStats, QueuedFile, UpdateCheckState, WorkerEvent,
 };
 use crate::net::app_update::spawn_app_update_check;
 use crate::net::ffmpeg_update::{is_remote_newer, spawn_update_check};
@@ -16,6 +16,7 @@ use crate::security::path_guard::{
     validate_input_file,
 };
 use crate::ui::ffmpeg_setup_window::render_ffmpeg_setup_window;
+use crate::ui::inspector_panel::render_inspector_panel;
 use crate::ui::language_window::render_language_window;
 use crate::ui::log_panel::{render_log_panel, render_log_window};
 use crate::ui::queue_panel::render_queue_panel;
@@ -49,6 +50,9 @@ pub struct FfmpegStudioApp {
     language_window_open: bool,
     language_search: String,
     settings: ConversionSettings,
+    workspace_mode: AppWorkspaceMode,
+    selected_file_id: Option<u64>,
+    inspector_raw_json_open: bool,
     queue: Vec<QueuedFile>,
     next_file_id: u64,
     is_running: bool,
@@ -101,6 +105,9 @@ impl FfmpegStudioApp {
             language_window_open: false,
             language_search: String::new(),
             settings: ConversionSettings::default(),
+            workspace_mode: AppWorkspaceMode::Convert,
+            selected_file_id: None,
+            inspector_raw_json_open: false,
             queue: Vec::new(),
             next_file_id: 1,
             is_running: false,
@@ -162,21 +169,71 @@ impl FfmpegStudioApp {
                 probe_error: None,
                 status: FileStatus::Probing,
             });
-
-            if let Some(ffprobe) = self.ffmpeg_info.ffprobe_path.clone() {
-                let tx = self.tx.clone();
-                let ctx_clone = ctx.clone();
-                thread::spawn(move || {
-                    let res = probe_media(&ffprobe, &valid_path);
-                    let _ = tx.send(WorkerEvent::ProbeCompleted {
-                        file_id,
-                        result: res,
-                    });
-                    ctx_clone.request_repaint();
-                });
-            } else if let Some(item) = self.queue.iter_mut().find(|f| f.id == file_id) {
-                item.status = FileStatus::Failed(t.ffprobe_not_found().to_string());
+            if self.selected_file_id.is_none() {
+                self.selected_file_id = Some(file_id);
             }
+
+            self.spawn_probe_worker(file_id, valid_path, ctx);
+        }
+    }
+
+    fn sync_selected_file(&mut self) {
+        if let Some(id) = self.selected_file_id
+            && self.queue.iter().any(|q| q.id == id)
+        {
+            return;
+        }
+        self.selected_file_id = self.queue.first().map(|q| q.id);
+    }
+
+    fn spawn_probe_worker(&mut self, file_id: u64, input_path: PathBuf, ctx: &egui::Context) {
+        let t = tr(self.language);
+        if let Some(ffprobe) = self.ffmpeg_info.ffprobe_path.clone() {
+            let tx = self.tx.clone();
+            let ctx_clone = ctx.clone();
+            thread::spawn(move || {
+                let res = probe_media(&ffprobe, &input_path);
+                let _ = tx.send(WorkerEvent::ProbeCompleted {
+                    file_id,
+                    result: res,
+                });
+                ctx_clone.request_repaint();
+            });
+        } else if let Some(item) = self.queue.iter_mut().find(|f| f.id == file_id) {
+            item.status = FileStatus::Failed(t.ffprobe_not_found().to_string());
+        }
+    }
+
+    fn reprobe_single(&mut self, file_id: u64, ctx: &egui::Context) {
+        let Some(input_path) = self
+            .queue
+            .iter_mut()
+            .find(|q| q.id == file_id)
+            .map(|item| {
+                item.media = None;
+                item.probe_error = None;
+                item.status = FileStatus::Probing;
+                item.input_path.clone()
+            })
+        else {
+            return;
+        };
+        self.spawn_probe_worker(file_id, input_path, ctx);
+    }
+
+    fn reprobe_all(&mut self, ctx: &egui::Context) {
+        let targets: Vec<(u64, PathBuf)> = self
+            .queue
+            .iter_mut()
+            .map(|item| {
+                item.media = None;
+                item.probe_error = None;
+                item.status = FileStatus::Probing;
+                (item.id, item.input_path.clone())
+            })
+            .collect();
+        for (file_id, path) in targets {
+            self.spawn_probe_worker(file_id, path, ctx);
         }
     }
 
@@ -466,6 +523,7 @@ impl eframe::App for FfmpegStudioApp {
                     self.language,
                     &self.ffmpeg_info,
                     &self.app_update_state,
+                    self.workspace_mode,
                     self.is_running,
                     has_pending_work,
                     self.queue.len(),
@@ -479,9 +537,18 @@ impl eframe::App for FfmpegStudioApp {
         if top_actions.clear_done {
             self.queue
                 .retain(|q| !matches!(q.status, FileStatus::Done { .. }));
+            self.sync_selected_file();
         }
         if top_actions.clear_all && !self.is_running {
             self.queue.clear();
+            self.sync_selected_file();
+        }
+        if let Some(mode) = top_actions.set_workspace_mode {
+            self.workspace_mode = mode;
+            self.sync_selected_file();
+        }
+        if top_actions.reprobe_all && !self.is_running {
+            self.reprobe_all(ui.ctx());
         }
         if top_actions.start_batch {
             self.start_batch(ui.ctx());
@@ -532,22 +599,53 @@ impl eframe::App for FfmpegStudioApp {
         });
 
         let first_queued = self.queue.first().cloned();
-        Panel::right("right_settings")
-            .resizable(true)
-            .default_size(400.0)
-            .min_size(340.0)
-            .max_size(520.0)
-            .frame(panel_frame)
-            .show(ui, |ui| {
-                render_settings_panel(
-                    ui,
-                    self.language,
-                    &mut self.settings,
-                    &self.ffmpeg_info,
-                    first_queued.as_ref(),
-                    self.is_running,
-                );
-            });
+        match self.workspace_mode {
+            AppWorkspaceMode::Convert => {
+                Panel::right("right_settings")
+                    .resizable(true)
+                    .default_size(400.0)
+                    .min_size(340.0)
+                    .max_size(520.0)
+                    .frame(panel_frame)
+                    .show(ui, |ui| {
+                        render_settings_panel(
+                            ui,
+                            self.language,
+                            &mut self.settings,
+                            &self.ffmpeg_info,
+                            first_queued.as_ref(),
+                            self.is_running,
+                        );
+                    });
+            }
+            AppWorkspaceMode::Inspect => {
+                let selected_item = self
+                    .selected_file_id
+                    .and_then(|id| self.queue.iter().find(|q| q.id == id))
+                    .or_else(|| self.queue.first())
+                    .cloned();
+                let mut reprobe_selected = false;
+                Panel::right("right_inspector")
+                    .resizable(true)
+                    .default_size(480.0)
+                    .min_size(360.0)
+                    .max_size(680.0)
+                    .frame(panel_frame)
+                    .show(ui, |ui| {
+                        reprobe_selected = render_inspector_panel(
+                            ui,
+                            self.language,
+                            selected_item.as_ref(),
+                            &mut self.inspector_raw_json_open,
+                        );
+                    });
+                if reprobe_selected
+                    && let Some(item) = selected_item
+                {
+                    self.reprobe_single(item.id, ui.ctx());
+                }
+            }
+        }
 
         let queue_actions = CentralPanel::default()
             .frame(Frame::central_panel(&ui.style()).inner_margin(Margin::same(12)))
@@ -557,6 +655,8 @@ impl eframe::App for FfmpegStudioApp {
                     self.language,
                     &mut self.queue,
                     &self.settings,
+                    self.workspace_mode,
+                    self.selected_file_id,
                     self.is_running,
                     hovering,
                 )
@@ -565,6 +665,14 @@ impl eframe::App for FfmpegStudioApp {
 
         if let Some(id) = queue_actions.remove_file_id {
             self.queue.retain(|q| q.id != id);
+            self.sync_selected_file();
+        }
+        if let Some(id) = queue_actions.select_file_id {
+            self.selected_file_id = Some(id);
+        }
+        if let Some(id) = queue_actions.inspect_file_id {
+            self.selected_file_id = Some(id);
+            self.workspace_mode = AppWorkspaceMode::Inspect;
         }
         if queue_actions.add_files_clicked && !self.is_running {
             self.open_file_picker(ui.ctx());
